@@ -1,7 +1,9 @@
-package com.lunaticlemon.lifecast;
+package com.lunaticlemon.lifecast.member;
 
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+
+import com.lunaticlemon.lifecast.R;
 
 public class SignUpActivity extends AppCompatActivity {
 

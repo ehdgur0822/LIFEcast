@@ -25,10 +25,10 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".LoginActivity"
+            android:name=".member.LoginActivity"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
-        <activity android:name=".SignUpActivity"></activity>
+        <activity android:name=".member.SignUpActivity"></activity>
     </application>
 
 </manifest>

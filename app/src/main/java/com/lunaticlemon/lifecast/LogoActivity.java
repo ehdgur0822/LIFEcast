@@ -5,6 +5,8 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 
+import com.lunaticlemon.lifecast.member.LoginActivity;
+
 // 'LIFEcase' logo를 보여주는 activity
 // 5초 후 자동으로 다음 Activity인 LoginActivity로 넘어감
 public class LogoActivity extends AppCompatActivity {

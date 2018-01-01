@@ -75,7 +75,6 @@ public class SignUpActivity extends AppCompatActivity {
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
-                // TODO Auto-generated method stub
             }
         });
 
@@ -90,7 +89,6 @@ public class SignUpActivity extends AppCompatActivity {
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
-                // TODO Auto-generated method stub
             }
         });
 
@@ -106,7 +104,6 @@ public class SignUpActivity extends AppCompatActivity {
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
-                // TODO Auto-generated method stub
             }
         });
 
@@ -121,7 +118,6 @@ public class SignUpActivity extends AppCompatActivity {
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
-                // TODO Auto-generated method stub
             }
         });
 
@@ -134,6 +130,9 @@ public class SignUpActivity extends AppCompatActivity {
         pw = edit_pw.getText().toString();
         nick = edit_nick.getText().toString();
 
+        //TODO check valildation
+
+        
         Toast.makeText(this, id, Toast.LENGTH_SHORT).show();
     }
 

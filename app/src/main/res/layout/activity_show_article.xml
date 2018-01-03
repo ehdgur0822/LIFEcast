@@ -114,15 +114,17 @@
             android:layout_weight="1"
             android:text="1991.8.22"
             android:textColor="#000000"
-            android:textSize="15dp"/>
+            android:textSize="20dp"/>
 
         <ImageButton
             android:id="@+id/imageButton2"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_gravity="center"
+            android:background="@null"
             android:onClick="onClickSearchDate"
-            app:srcCompat="@android:drawable/ic_menu_my_calendar" />
+            android:scaleType="fitXY"
+            app:srcCompat="@drawable/ic_calendar" />
 
         <TextView
             android:id="@+id/textView_weather"
@@ -137,11 +139,14 @@
 
         <ImageButton
             android:id="@+id/imageButton3"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_gravity="center"
+            android:layout_marginRight="10dp"
+            android:background="@null"
             android:onClick="onClickRefreshWeather"
-            app:srcCompat="@android:drawable/ic_menu_rotate" />
+            android:scaleType="fitXY"
+            app:srcCompat="@drawable/ic_refresh" />
     </LinearLayout>
 
     <LinearLayout

@@ -6,7 +6,6 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -315,7 +314,7 @@ public class SignUpActivity extends AppCompatActivity {
     }
 
 
-    // database에 사용자 정보 추가
+    // 서버와 http protocol을 이용하여 정보를 보내 database에 사용자 정보 추가
     // parameter : (id, pw, nickname, gender, year, month, day, city)
     class InsertMemberData extends AsyncTask<String, Void, String> {
 
@@ -330,11 +329,11 @@ public class SignUpActivity extends AppCompatActivity {
 
             if(result.equals("success")) {
                 // 회원가입 성공, LoginActivity로 돌아감
-                Toast.makeText(SignUpActivity.this, "signup success", Toast.LENGTH_SHORT).show();
+                Toast.makeText(SignUpActivity.this, "가입성공", Toast.LENGTH_SHORT).show();
                 SignUpActivity.this.finish();
             }
             else {
-                Toast.makeText(SignUpActivity.this, "signup fail", Toast.LENGTH_SHORT).show();
+                Toast.makeText(SignUpActivity.this, "가입실패", Toast.LENGTH_SHORT).show();
             }
         }
 
@@ -353,7 +352,7 @@ public class SignUpActivity extends AppCompatActivity {
 
             String birthday = year + "-" + month + "-" + day;
 
-            Log.d("insert", id+"-"+pw+"-"+nickname+"-"+gender+"-"+year+"-"+month+"-"+day+"-"+city+"-"+birthday);
+            //Log.d("insert", id+"/"+pw+"/"+nickname+"/"+gender+"/"+year+"/"+month+"/"+day+"/"+city);
             String serverURL = "http://115.71.236.22/signup.php";
             String postParameters = "id=" + id + "&pw=" + pw + "&nickname=" + nickname + "&gender=" + gender + "&birthday=" + birthday + "&city=" + city;
 
@@ -404,7 +403,7 @@ public class SignUpActivity extends AppCompatActivity {
         }
     }
 
-    // id 혹은 nickname 중복 확인
+    // 서버와 http protocol을 이용하여 정보를 보내 사용자가 입력한 id 혹은 nickname 중복 확인
     // 1st parameter : 사용자가 입력한 id 혹은 nickname
     // 2nd parameter : 중복 확인하는 것이 id일 경우 id, nickname의 경우 nick
     class CheckDuplicate extends AsyncTask<String, Void, String> {

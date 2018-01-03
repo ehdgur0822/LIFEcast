@@ -1,12 +1,21 @@
 package com.lunaticlemon.lifecast;
 
 import android.app.DatePickerDialog;
+import android.app.SearchManager;
+import android.content.Context;
+import android.content.DialogInterface;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.SearchView;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.DatePicker;
 import android.widget.TextView;
+
+import com.lunaticlemon.lifecast.member.LoginActivity;
 
 import java.util.Calendar;
 
@@ -28,12 +37,53 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
     TextView textView_entertainment, textView_world, textView_culture, textView_science;
 
     enum section {POLITIC, ECONOMY, SOCIETY, SPORT, ENTERTAINMENT, WORLD, CULTURE, SCIENCE};
-    section cur_selected_section = section.POLITIC;
+    section cur_selected_section;
+
+    String nickname, gender, birthday, city, created, preference;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_show_article);
+
+        nickname = getIntent().getExtras().getString("nickname");
+        gender = getIntent().getExtras().getString("gender");
+        birthday = getIntent().getExtras().getString("birthday");
+        city = getIntent().getExtras().getString("city");
+        created = getIntent().getExtras().getString("created");
+        preference = getIntent().getExtras().getString("preference");
+
+        // 사용자의 선호 분야를 가장먼저 보여주기 위해 section 초기화
+        switch(preference)
+        {
+            case "politic":
+                cur_selected_section = section.POLITIC;
+                break;
+            case "economy":
+                cur_selected_section = section.ECONOMY;
+                break;
+            case "society":
+                cur_selected_section = section.SOCIETY;
+                break;
+            case "sport":
+                cur_selected_section = section.SPORT;
+                break;
+            case "entertainment":
+                cur_selected_section = section.ENTERTAINMENT;
+                break;
+            case "world":
+                cur_selected_section = section.WORLD;
+                break;
+            case "culture":
+                cur_selected_section = section.CULTURE;
+                break;
+            case "science":
+                cur_selected_section = section.SCIENCE;
+                break;
+            default:
+            cur_selected_section = section.POLITIC;
+                break;
+        }
 
         textView_date = (TextView)findViewById(R.id.textView_date);
         textView_weather = (TextView)findViewById(R.id.textView_weather);
@@ -153,6 +203,62 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
         this.searchByGPS();
     }
 
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu)
+    {
+        getMenuInflater().inflate(R.menu.actionbar, menu);
+
+        SearchManager manager = (SearchManager) getSystemService(Context.SEARCH_SERVICE);
+
+        SearchView search = (SearchView) menu.findItem(R.id.search).getActionView();
+
+        search.setSearchableInfo(manager.getSearchableInfo(getComponentName()));
+
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item){
+        switch (item.getItemId())
+        {
+            case R.id.profile_btn:
+                // TODO
+                return true;
+            case R.id.setting_btn:
+                // TODO
+                return true;
+            case R.id.logout_btn:
+                setResult(LoginActivity.result_logout);
+                finish();
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
+        }
+    }
+
+    @Override
+    public void onBackPressed()
+    {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setMessage("종료하시겠습니까?");
+        builder.setPositiveButton("예",new DialogInterface.OnClickListener(){
+            public void onClick(DialogInterface dialog, int whichButton)
+            {
+                setResult(LoginActivity.result_finish);
+                finish();
+            }
+        });
+
+        builder.setNegativeButton("아니오",new DialogInterface.OnClickListener(){
+            public void onClick(DialogInterface dialog, int whichButton)
+            {
+            }
+        });
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
     // weatherInfo object contains all information returned by Yahoo Weather API
     // if `weatherInfo` is null, you can get the error from `errorType`
     @Override
@@ -160,7 +266,8 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
         if(weatherInfo != null)
         {
             // 현재 gps 위치의 날씨와 온도를 표시
-            textView_weather.setText(weatherInfo.getCurrentText() + "\n" + weatherInfo.getCurrentTemp() + "\u00b0" + "C" );
+            textView_weather.setText(changeWeatherCodeToKorean(weatherInfo.getCurrentCode()) + "\n" + weatherInfo.getCurrentTemp() + "\u00b0" + "C" );
+
         }
         else
         {
@@ -262,6 +369,111 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
         searchByGPS();
     }
 
-
+    public String changeWeatherCodeToKorean(int code)
+    {
+        // detail code information
+        // https://developer.yahoo.com/weather/documentation.html#response
+        switch(code)
+        {
+            case 0:
+                return "토네이도";
+            case 1:
+                return "열대폭풍";
+            case 2:
+                return "허리케인";
+            case 3:
+                return "번개, 비";
+            case 4:
+                return "번개, 비";
+            case 5:
+                return "눈, 비";
+            case 6:
+                return "진눈깨비";
+            case 7:
+                return "진눈깨비";
+            case 8:
+                return "이슬비";
+            case 9:
+                return "이슬비";
+            case 10:
+                return "폭우";
+            case 11:
+                return "소나기";
+            case 12:
+                return "소나기";
+            case 13:
+                return "소나기성 눈";
+            case 14:
+                return "소나기성 눈";
+            case 15:
+                return "폭설";
+            case 16:
+                return "눈";
+            case 17:
+                return "우박";
+            case 18:
+                return "진눈깨비";
+            case 19:
+                return "먼지";
+            case 20:
+                return "안개";
+            case 21:
+                return "안개";
+            case 22:
+                return "안개";
+            case 23:
+                return "거센 바람";
+            case 24:
+                return "바람";
+            case 25:
+                return "추움";
+            case 26:
+                return "흐림";
+            case 27:
+                return "흐림";
+            case 28:
+                return "흐림";
+            case 29:
+                return "흐림";
+            case 30:
+                return "흐림";
+            case 31:
+                return "맑음";
+            case 32:
+                return "화창함";
+            case 33:
+                return "갬";
+            case 34:
+                return "갬";
+            case 35:
+                return "진눈깨비";
+            case 36:
+                return "더위";
+            case 37:
+                return "뇌우";
+            case 38:
+                return "뇌우";
+            case 39:
+                return "뇌우";
+            case 40:
+                return "뇌우";
+            case 41:
+                return "폭설";
+            case 42:
+                return "소나기성 눈";
+            case 43:
+                return "폭설";
+            case 44:
+                return "흐림";
+            case 45:
+                return "뇌우";
+            case 46:
+                return "눈";
+            case 47:
+                return "뇌우";
+            default:
+                return "맑음";
+        }
+    }
 
 }

@@ -3,10 +3,9 @@
     package="com.lunaticlemon.lifecast">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
         android:allowBackup="true"
@@ -33,9 +32,10 @@
             android:name=".member.SignUpActivity"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
-        <activity android:name=".ShowArticleActivity"
-            android:screenOrientation="portrait">
-        </activity>
+        <activity
+            android:name=".show_article.ShowArticleActivity"
+            android:screenOrientation="portrait" />
+        <activity android:name=".show_article.WebViewActivity" />
     </application>
 
 </manifest>

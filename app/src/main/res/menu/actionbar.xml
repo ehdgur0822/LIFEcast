@@ -9,11 +9,14 @@
         android:title="search"/>
 
     <item android:id="@+id/profile_btn"
-        android:title="profile"/>
+        android:title="프로필"/>
 
-    <item android:id="@+id/setting_btn"
-        android:title="setting"/>
+    <item android:id="@+id/bucket_btn"
+        android:title="보관함"/>
+
+    <item android:id="@+id/example_btn"
+        android:title="카메라"/>
 
     <item android:id="@+id/logout_btn"
-        android:title="logout"/>
+        android:title="로그아웃"/>
 </menu>

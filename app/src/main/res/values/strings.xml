@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">LIFEcast</string>
+
+    <integer-array name="slide_img_arr">
+        <item>@drawable/slide_keyword</item>
+        <item>@drawable/slide_gender</item>
+        <item>@drawable/slide_local</item>
+    </integer-array>
 </resources>

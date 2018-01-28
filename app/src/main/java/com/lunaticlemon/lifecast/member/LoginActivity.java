@@ -19,7 +19,7 @@ import android.widget.EditText;
 import android.widget.Toast;
 
 import com.lunaticlemon.lifecast.R;
-import com.lunaticlemon.lifecast.ShowArticleActivity;
+import com.lunaticlemon.lifecast.show_article.ShowArticleActivity;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -31,16 +31,15 @@ import java.util.StringTokenizer;
 
 public class LoginActivity extends AppCompatActivity {
 
+    public static int request_login = 1001;
+    public static int result_logout = 2001, result_finish = 2002, result_withdraw = 2003;
+
     SharedPreferences pref;
     SharedPreferences.Editor editor;
 
     EditText editText_id, editText_pw;
     CheckBox autoLogin;
     boolean autoLoginChecked;
-
-    public static int request_login = 1001;
-    public static int result_logout = 2001, result_finish = 2002;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,6 +57,15 @@ public class LoginActivity extends AppCompatActivity {
 
         pref = getSharedPreferences("lifecast",MODE_PRIVATE);
         editor = pref.edit();
+
+        if(pref.getBoolean("autoLogin",false))  // 자동로그인
+        {
+            String id = pref.getString("id","default"); // default : should never happened
+            String pw = pref.getString("pw","default");
+
+            Login login_task = new Login();
+            login_task.execute(id, pw);
+        }
 
         editText_id = (EditText) findViewById(R.id.editText_id);
         editText_pw = (EditText) findViewById(R.id.editText_pw);
@@ -132,6 +140,17 @@ public class LoginActivity extends AppCompatActivity {
                 editText_pw.setText("");
                 editText_id.setText("");
             }
+            else if (resultCode == result_withdraw)    // log out
+            {
+                editor.remove("id");
+                editor.remove("pw");
+                editor.putBoolean("autoLogin", false);
+                editor.commit();
+
+                autoLogin.setChecked(false);
+                editText_pw.setText("");
+                editText_id.setText("");
+            }
         }
     }
 
@@ -159,15 +178,23 @@ public class LoginActivity extends AppCompatActivity {
             }
             else
             {
-                String nickname, gender, birthday, city, created, preference;
+                String number = null, nickname = null, gender = null, birthday = null, city = null, created = null, preference = null;
                 StringTokenizer st = new StringTokenizer(result, "/");
 
-                nickname = st.nextToken();
-                gender = st.nextToken();
-                birthday = st.nextToken();
-                city = st.nextToken();
-                created = st.nextToken();
-                preference = st.nextToken();
+                if(st.hasMoreTokens())
+                    number = st.nextToken();
+                if(st.hasMoreTokens())
+                    nickname = st.nextToken();
+                if(st.hasMoreTokens())
+                    gender = st.nextToken();
+                if(st.hasMoreTokens())
+                    birthday = st.nextToken();
+                if(st.hasMoreTokens())
+                    city = st.nextToken();
+                if(st.hasMoreTokens())
+                    created = st.nextToken();
+                if(st.hasMoreTokens())
+                    preference = st.nextToken();
 
                 // autoLogin 체크되있을 경우 sharedpreference에 id, pw, check여부 저장
                 if(autoLoginChecked == true) {
@@ -177,14 +204,18 @@ public class LoginActivity extends AppCompatActivity {
                     editor.commit();
                 }
 
-                Intent intent = new Intent(LoginActivity.this, ShowArticleActivity.class);
-                intent.putExtra("nickname",nickname);
-                intent.putExtra("gender",gender);
-                intent.putExtra("birthday",birthday);
-                intent.putExtra("city",city);
-                intent.putExtra("created",created);
-                intent.putExtra("preference",preference);
-                startActivityForResult(intent,request_login);
+                if(number != null && nickname != null && gender != null && birthday != null && city != null && created != null && preference != null) {
+                    Intent intent = new Intent(LoginActivity.this, ShowArticleActivity.class);
+                    intent.putExtra("number", Integer.parseInt(number));
+                    intent.putExtra("id", id);
+                    intent.putExtra("nickname", nickname);
+                    intent.putExtra("gender", gender);
+                    intent.putExtra("birthday", birthday);
+                    intent.putExtra("city", city);
+                    intent.putExtra("created", created);
+                    intent.putExtra("preference", preference);
+                    startActivityForResult(intent, request_login);
+                }
             }
         }
 
@@ -248,7 +279,7 @@ public class LoginActivity extends AppCompatActivity {
 
     //퍼미션 관련 메소드
     static final int PERMISSIONS_REQUEST_CODE = 1000;
-    String[] PERMISSIONS  = {"android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION",};
+    String[] PERMISSIONS  = {"android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION", "android.permission.CAMERA"};
 
     private boolean hasPermissions(String[] permissions) {
         int result;
@@ -282,7 +313,9 @@ public class LoginActivity extends AppCompatActivity {
                     boolean accesscoarselocationPermissionAccepted = grantResults[1]
                             == PackageManager.PERMISSION_GRANTED;
 
-                    if (!accessfinelocationPermissionAccepted || !accesscoarselocationPermissionAccepted) {
+                    boolean accesscameraPermissionAccepted = grantResults[2]
+                            == PackageManager.PERMISSION_GRANTED;
+                    if (!accessfinelocationPermissionAccepted || !accesscoarselocationPermissionAccepted || !accesscameraPermissionAccepted) {
                         showDialogForPermission("앱을 실행하려면 퍼미션을 허가하셔야합니다.");
                         return;
                     }

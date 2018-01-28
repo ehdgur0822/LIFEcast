@@ -25,6 +25,8 @@ import android.widget.Toast;
 import com.chabbal.slidingdotsplash.OnItemClickListener;
 import com.chabbal.slidingdotsplash.SlidingSplashView;
 import com.lunaticlemon.lifecast.R;
+import com.lunaticlemon.lifecast.camera.CameraActivity;
+import com.lunaticlemon.lifecast.option_menu.NewsBucketActivity;
 import com.lunaticlemon.lifecast.option_menu.ProfileActivity;
 
 import org.json.JSONArray;
@@ -81,7 +83,7 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
     int selected_year, selected_month, selected_day;   // 사용자가 현재 선택한 날짜
 
     // 사용자 정보
-    int number;
+    int user_number;
     String id, nickname, gender, birthday, city, created, preference;
 
     Keyword_dialog keyword_dialog;
@@ -92,7 +94,7 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_show_article);
 
-        number = getIntent().getExtras().getInt("number");
+        user_number = getIntent().getExtras().getInt("number");
         id = getIntent().getExtras().getString("id");
         nickname = getIntent().getExtras().getString("nickname");
         gender = getIntent().getExtras().getString("gender");
@@ -269,9 +271,12 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
                         statistic_dialog.show();
                         break;
                     case 2: // 지역 뉴스 보여주기
-                        startActivity(new Intent(getApplication(), MapActivity.class));
-                        break;
-                    case 3:
+                        Intent intent = new Intent(ShowArticleActivity.this, MapActivity.class);
+                        intent.putExtra("city",city);
+                        intent.putExtra("selected_year",selected_year);
+                        intent.putExtra("selected_month",selected_month);
+                        intent.putExtra("selected_day",selected_day);
+                        startActivity(intent);
                         break;
                 }
             }
@@ -286,7 +291,7 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
         listview_news.setOnItemClickListener(new AdapterView.OnItemClickListener() {
 
             @Override
-            public void onItemClick(AdapterView<?> arg0, View arg1, int position, long arg3) {
+            public void onItemClick(AdapterView<?> arg0, View arg1, int position, long id) {
                 News news = (News)listview_news.getItemAtPosition(position);
 
                 // web view에 해당 url 보여줌
@@ -296,6 +301,38 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
 
                 addView(cur_selected_section, news.getUrl(), gender, birthday, city);
                 //redirectUsingCustomTab(news.getUrl());
+            }
+        });
+        listview_news.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+            @Override
+            public boolean onItemLongClick(AdapterView<?> arg0, View arg1, int position, long id) {
+                final News news = (News)listview_news.getItemAtPosition(position);
+
+                AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(ShowArticleActivity.this);
+
+                // set dialog message
+                alertDialogBuilder
+                        .setMessage("해당 기사를 보관함에 추가하시겠습니까?")
+                        .setCancelable(false)
+                        .setPositiveButton("예",new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog,int id) {
+                                addBucket(cur_selected_section, user_number, news.getId());
+                                dialog.cancel();
+                            }
+                        })
+                        .setNegativeButton("아니요",new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog,int id) {
+                                dialog.cancel();
+                            }
+                        });
+
+                // create alert dialog
+                AlertDialog alertDialog = alertDialogBuilder.create();
+
+                // show it
+                alertDialog.show();
+
+                return true;
             }
         });
 
@@ -360,22 +397,27 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
         switch (item.getItemId())
         {
             case R.id.profile_btn:
-                Intent intent = new Intent(ShowArticleActivity.this, ProfileActivity.class);
-                intent.putExtra("id",id);
-                intent.putExtra("nickname",nickname);
-                intent.putExtra("gender",gender);
-                intent.putExtra("birthday",birthday);
-                intent.putExtra("city",city);
-                intent.putExtra("created",created);
-                startActivityForResult(intent,request_showarticle);
+                Intent intent_profile = new Intent(ShowArticleActivity.this, ProfileActivity.class);
+                intent_profile.putExtra("id",id);
+                intent_profile.putExtra("nickname",nickname);
+                intent_profile.putExtra("gender",gender);
+                intent_profile.putExtra("birthday",birthday);
+                intent_profile.putExtra("city",city);
+                intent_profile.putExtra("created",created);
+                startActivityForResult(intent_profile,request_showarticle);
                 return true;
-            case R.id.setting_btn:
-                // TODO
-                // 보관함 추가?
+            case R.id.bucket_btn:
+                Intent intent_bucket = new Intent(ShowArticleActivity.this, NewsBucketActivity.class);
+                intent_bucket.putExtra("number",user_number);
+                startActivity(intent_bucket);
                 return true;
             case R.id.logout_btn:
                 setResult(result_logout);
                 finish();
+                return true;
+            case R.id.example_btn:
+                Intent intent_camera= new Intent(ShowArticleActivity.this, CameraActivity.class);
+                startActivity(intent_camera);
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
@@ -751,7 +793,7 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
                             int view = news.getInt("view");
 
 
-                            news_adapter.addItem(id, keyword, url, title, date, newspaper, view);
+                            news_adapter.addItem(id, keyword, url, title, date, newspaper, view, "null");
                         }
 
                         news_adapter.notifyDataSetChanged();
@@ -902,5 +944,106 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
 
         AddViewData AddView_Task = new AddViewData();
         AddView_Task.execute(section, _url, _gender, _birthday, _city);
+    }
+
+    public void addBucket(section selected_section, int user_number, int news_id){
+
+        // 서버와 http protocol을 이용하여 사용자가 선택한 뉴스를 사용자의 보관함에 넣음
+        // 1st parameter : 사용자가 선택한 분야
+        // 2nd parameter : 사용자의 number
+        // 3rd parameter : 뉴스의 id
+        class AddBucketData extends AsyncTask<String, Void, String>{
+
+            @Override
+            protected String doInBackground(String... params) {
+
+                String section = (String)params[0];
+                String user_number = (String)params[1];
+                String news_id = (String)params[2];
+
+                String serverURL = "http://115.71.236.22/add_bucket.php";
+                String postParameters = "section=" + section + "&user_number=" + user_number +"&news_id=" + news_id + "&action=" + "insert";
+                try {
+                    URL url = new URL(serverURL);
+                    HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
+
+                    httpURLConnection.setReadTimeout(5000);
+                    httpURLConnection.setConnectTimeout(5000);
+                    httpURLConnection.setRequestMethod("POST");
+                    //httpURLConnection.setRequestProperty("content-type", "application/json");
+                    httpURLConnection.setDoInput(true);
+                    httpURLConnection.connect();
+
+                    OutputStream outputStream = httpURLConnection.getOutputStream();
+                    outputStream.write(postParameters.getBytes("UTF-8"));
+                    outputStream.flush();
+                    outputStream.close();
+
+                    int responseStatusCode = httpURLConnection.getResponseCode();
+
+                    InputStream inputStream;
+                    if(responseStatusCode == HttpURLConnection.HTTP_OK) {
+                        inputStream = httpURLConnection.getInputStream();
+                    }
+                    else{
+                        inputStream = httpURLConnection.getErrorStream();
+                    }
+
+                    InputStreamReader inputStreamReader = new InputStreamReader(inputStream, "UTF-8");
+                    BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
+
+                    StringBuilder sb = new StringBuilder();
+                    String line = null;
+
+                    while((line = bufferedReader.readLine()) != null){
+                        sb.append(line);
+                    }
+
+                    bufferedReader.close();
+                    return sb.toString();
+
+
+                } catch (Exception e) {
+                    return new String("add bucket Error: " + e.getMessage());
+                }
+            }
+
+            @Override
+            protected void onPostExecute(String result){
+                Toast.makeText(ShowArticleActivity.this, "보관함 담기 성공", Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        String section;
+        switch(selected_section)
+        {
+            case POLITIC:
+                section = "politic";
+                break;
+            case ECONOMY:
+                section = "economy";
+                break;
+            case SOCIETY:
+                section = "society";
+                break;
+            case SPORT:
+                section = "sport";
+                break;
+            case WORLD:
+                section = "world";
+                break;
+            case CULTURE:
+                section = "culture";
+                break;
+            case SCIENCE:
+                section = "science";
+                break;
+            default:
+                section = "politic";
+                break;
+        }
+
+        AddBucketData AddBucket_Task = new AddBucketData();
+        AddBucket_Task.execute(section, Integer.toString(user_number), Integer.toString(news_id));
     }
 }

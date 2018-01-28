@@ -6,6 +6,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <uses-feature android:name="android.hardware.camera2.full" />
 
     <application
         android:allowBackup="true"
@@ -14,6 +17,10 @@
         android:roundIcon="@drawable/app_icon"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyA47iHwIR6RDYTxM8Wv2c-buG7WVXwFfEU" />
+
         <activity
             android:name=".LogoActivity"
             android:screenOrientation="portrait"
@@ -36,6 +43,11 @@
             android:name=".show_article.ShowArticleActivity"
             android:screenOrientation="portrait" />
         <activity android:name=".show_article.WebViewActivity" />
+        <activity android:name=".option_menu.ProfileActivity" />
+        <activity android:name=".show_article.MapActivity" />
+        <activity android:name=".option_menu.NewsBucketActivity" />
+        <activity android:name=".camera.CameraActivity"
+            android:theme="@style/Theme.AppCompat.NoActionBar"/>
     </application>
 
 </manifest>

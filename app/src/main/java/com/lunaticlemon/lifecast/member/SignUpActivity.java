@@ -40,15 +40,15 @@ public class SignUpActivity extends AppCompatActivity {
     // id_valid, pw_valid, nick_valid : 각각 id, pw, nick 유효성 여부 (true : 유효함, false : 유효하지않음)
     // city : 입력 전에는 null, 입력 후에는 사용자가 입력한 값으로 변환
     // gender : 입력 전에는 null, 입력 후에는 male or female 값으로 변환
-    // year_count, month_count, day_count, city_count : 입력 전에는 0, 입력 후 0이상의 값으로 변환
+    // year_count, month_count, day_count, city_count : 입력 전에는 0, 입력 후 0이상의 값으로 변환 (사용자가 입력하였는지 여부 확인 위해 사용)
     String id, pw, nick, city, gender = "";
     boolean id_valid = false, pw_valid = false, nick_valid = false;
     int year, month, day;
     int year_count = -1, month_count = -1, day_count = -1, city_count = -1;
 
-    Integer[] arr_year = new Integer[Calendar.getInstance().get(Calendar.YEAR) - 1949];
-    Integer[] arr_month = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
-    Integer[] arr_day = new Integer[31];
+    Integer[] arr_year = new Integer[Calendar.getInstance().get(Calendar.YEAR) - 1949]; //  1950 ~ 현재 년도
+    Integer[] arr_month = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};  // 1월 ~ 12월
+    Integer[] arr_day = new Integer[31]; // 1일 ~ 31일
     String[] arr_city = {
             "서울","부산","대구","인천","광주","대전","울산","경기",
             "강원","충북","충남","전북","전남","경북","경남","제주"
@@ -71,13 +71,14 @@ public class SignUpActivity extends AppCompatActivity {
         spinner_day = (Spinner) findViewById(R.id.spinner_day);
         spinner_city = (Spinner) findViewById(R.id.spinner_city);
 
-        // id 유효성 체크
+
         edit_id.addTextChangedListener(new TextWatcher() {
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
             }
 
+            // id 유효성 체크
             @Override
             public void afterTextChanged(Editable s) {
                 // id : 6~12자의 영문 또는 숫자
@@ -99,13 +100,14 @@ public class SignUpActivity extends AppCompatActivity {
             }
         });
 
-        // pw 유효성 체크
+
         edit_pw.addTextChangedListener(new TextWatcher() {
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
             }
 
+            // pw 유효성 체크
             @Override
             public void afterTextChanged(Editable s) {
                 // pw : 6~12자의 영문,숫자와 특수문자
@@ -128,17 +130,18 @@ public class SignUpActivity extends AppCompatActivity {
             }
         });
 
-        // nickname 유효성 체크
+
         edit_nick.addTextChangedListener(new TextWatcher() {
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
             }
 
+            // nickname 유효성 체크
             @Override
             public void afterTextChanged(Editable s) {
                 // nick : 숫자포함 2~5자 한글, 3~10자 영문,숫자
-                if(Pattern.matches("^[0-9가-힣]{2,5}$", s.toString()) || Pattern.matches("^[a-zA-Z0-9]{3,10}$", s.toString()))
+                if(Pattern.matches("^[0-9가-힣]{2,5}$", s.toString()) || Pattern.matches("^[a-zA-Z0-9]{3,10}$", s.toString()) || Pattern.matches("^[0-9a-zA-Z가-힣]{2,7}$", s.toString()))
                 {
                     CheckDuplicate checkDuplicate_task = new CheckDuplicate();
                     checkDuplicate_task.execute(s.toString() , "nick");
@@ -187,6 +190,7 @@ public class SignUpActivity extends AppCompatActivity {
         ArrayAdapter<String> adapter_city = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, arr_city);
 
         spinner_year.setAdapter(adapter_year);
+        spinner_year.setSelection(40);
         spinner_month.setAdapter(adapter_month);
         spinner_day.setAdapter(adapter_day);
         spinner_city.setAdapter(adapter_city);
@@ -195,9 +199,11 @@ public class SignUpActivity extends AppCompatActivity {
 
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                // Get selected item
                 int selected_id = spinner_year.getSelectedItemPosition();
+                // 사용자가 선택한 년도
                 year = arr_year[selected_id];
+
+                // year_count : 입력 전에는 0, 입력 후 0이상의 값으로 변환
                 year_count++;
             }
 
@@ -210,9 +216,12 @@ public class SignUpActivity extends AppCompatActivity {
 
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                // Get selected item
                 int selected_id = spinner_month.getSelectedItemPosition();
+
+                // 사용자가 선택한 월
                 month = arr_month[selected_id];
+
+                // month_count : 입력 전에는 0, 입력 후 0이상의 값으로 변환
                 month_count++;
             }
 
@@ -225,9 +234,12 @@ public class SignUpActivity extends AppCompatActivity {
 
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                // Get selected item
                 int selected_id = spinner_day.getSelectedItemPosition();
+
+                // 사용자가 선택한 일
                 day = arr_day[selected_id];
+
+                // day_count : 입력 전에는 0, 입력 후 0이상의 값으로 변환
                 day_count++;
 
             }
@@ -241,9 +253,12 @@ public class SignUpActivity extends AppCompatActivity {
 
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                // Get select item
                 int selected_id = spinner_city.getSelectedItemPosition();
+
+                // 사용자가 선택한 지역
                 city = arr_city[selected_id];
+
+                // city_count : 입력 전에는 0, 입력 후 0이상의 값으로 변환
                 city_count++;
             }
 

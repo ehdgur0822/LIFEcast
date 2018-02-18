@@ -5,7 +5,6 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -18,15 +17,17 @@ import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.lunaticlemon.lifecast.R;
 import com.lunaticlemon.lifecast.show_article.ShowArticleActivity;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.StringTokenizer;
 
 public class LoginActivity extends AppCompatActivity {
@@ -36,6 +37,11 @@ public class LoginActivity extends AppCompatActivity {
 
     SharedPreferences pref;
     SharedPreferences.Editor editor;
+
+    String TAG = "Login";
+
+    // http request queue
+    RequestQueue volley_queue;
 
     EditText editText_id, editText_pw;
     CheckBox autoLogin;
@@ -55,6 +61,8 @@ public class LoginActivity extends AppCompatActivity {
             }
         }
 
+        volley_queue = Volley.newRequestQueue(this);
+
         pref = getSharedPreferences("lifecast",MODE_PRIVATE);
         editor = pref.edit();
 
@@ -63,8 +71,7 @@ public class LoginActivity extends AppCompatActivity {
             String id = pref.getString("id","default"); // default : should never happened
             String pw = pref.getString("pw","default");
 
-            Login login_task = new Login();
-            login_task.execute(id, pw);
+            login(id, pw);
         }
 
         editText_id = (EditText) findViewById(R.id.editText_id);
@@ -89,6 +96,16 @@ public class LoginActivity extends AppCompatActivity {
         });
     }
 
+    @Override
+    public void onStop()
+    {
+        super.onStop();
+
+        // http request가 남아있을 시 모두 취소
+        if(volley_queue != null)
+            volley_queue.cancelAll(TAG);
+    }
+
     // sign up button 클릭 시 호출
     public void onClick_btn_signup(View v)
     {
@@ -98,7 +115,6 @@ public class LoginActivity extends AppCompatActivity {
     // log in button  클릭 시 호출
     public void onClick_btn_login(View v)
     {
-        // TODO
         String id, pw;
 
         id = editText_id.getText().toString();
@@ -112,10 +128,9 @@ public class LoginActivity extends AppCompatActivity {
         {
             Toast.makeText(this, "password를 입력하세요", Toast.LENGTH_SHORT).show();
         }
-        else    // id, pw 입력한 경우
+        else    // id, pw 모두 입력한 경우
         {
-            Login login_task = new Login();
-            login_task.execute(id, pw);
+            login(id, pw);
         }
 
     }
@@ -154,132 +169,94 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-
     // 서버와 http protocol을 이용하여 정보를 보내 사용자가 입력한 정보와 database에 저장된 정보 일치여부 확인
     // parameter : (id, pw)
-    class Login extends AsyncTask<String, Void, String> {
+    // response : (false : 로그인 정보 불일치 , true : 로그인 정보 일치)
+    public void login(final String id, final String pw)
+    {
+        String url = "http://115.71.236.22/login.php";
+        StringRequest postRequest = new StringRequest(Request.Method.POST, url,
+                new Response.Listener<String>()
+                {
+                    @Override
+                    public void onResponse(String response) {
+                        if(response.equals("false"))
+                        {
+                            Toast.makeText(LoginActivity.this, "ID 또는 password가 일치하지 않습니다.", Toast.LENGTH_SHORT).show();
+                        }
+                        else
+                        {
+                            String number = null, nickname = null, gender = null, birthday = null, city = null, created = null, preference = null;
+                            StringTokenizer st = new StringTokenizer(response, "/");
 
-        String id, pw;
+                            if(st.hasMoreTokens())
+                                number = st.nextToken();
+                            if(st.hasMoreTokens())
+                                nickname = st.nextToken();
+                            if(st.hasMoreTokens())
+                                gender = st.nextToken();
+                            if(st.hasMoreTokens())
+                                birthday = st.nextToken();
+                            if(st.hasMoreTokens())
+                                city = st.nextToken();
+                            if(st.hasMoreTokens())
+                                created = st.nextToken();
+                            if(st.hasMoreTokens())
+                                preference = st.nextToken();
 
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-        }
+                            // autoLogin 체크되있을 경우 sharedpreference에 id, pw, check여부 저장
+                            if(autoLoginChecked == true) {
+                                editor.putString("id", id);
+                                editor.putString("pw", pw);
+                                editor.putBoolean("autoLogin", true);
+                                editor.commit();
+                            }
 
-        // 정보가 일치할 경우 (nickname / gender / birthday / city / created / preference) 형태의 '/' 구분자 사용한 정보 받음
-        // 정보가 일치하지 않을 경우 false
-        @Override
-        protected void onPostExecute(String result) {
-            super.onPostExecute(result);
-
-            if(result.equals("false"))
+                            // 로그인 성공
+                            if(number != null && nickname != null && gender != null && birthday != null && city != null && created != null && preference != null) {
+                                Intent intent = new Intent(LoginActivity.this, ShowArticleActivity.class);
+                                intent.putExtra("number", Integer.parseInt(number));
+                                intent.putExtra("id", id);
+                                intent.putExtra("nickname", nickname);
+                                intent.putExtra("gender", gender);
+                                intent.putExtra("birthday", birthday);
+                                intent.putExtra("city", city);
+                                intent.putExtra("created", created);
+                                intent.putExtra("preference", preference);
+                                startActivityForResult(intent, request_login);
+                            }
+                        }
+                    }
+                },
+                new Response.ErrorListener()
+                {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        Toast.makeText(LoginActivity.this, "다시 중복확인을 해주세요", Toast.LENGTH_SHORT).show();
+                    }
+                }
+        )
+        {
+            @Override
+            protected Map<String, String> getParams()
             {
-                Toast.makeText(LoginActivity.this, "ID 또는 password가 일치하지 않습니다.", Toast.LENGTH_SHORT).show();
+                Map<String, String>  params = new HashMap<String, String>();
+                params.put("id", id);
+                params.put("pw", pw);
+
+                return params;
             }
-            else
-            {
-                String number = null, nickname = null, gender = null, birthday = null, city = null, created = null, preference = null;
-                StringTokenizer st = new StringTokenizer(result, "/");
+        };
+        postRequest.setTag(TAG);
 
-                if(st.hasMoreTokens())
-                    number = st.nextToken();
-                if(st.hasMoreTokens())
-                    nickname = st.nextToken();
-                if(st.hasMoreTokens())
-                    gender = st.nextToken();
-                if(st.hasMoreTokens())
-                    birthday = st.nextToken();
-                if(st.hasMoreTokens())
-                    city = st.nextToken();
-                if(st.hasMoreTokens())
-                    created = st.nextToken();
-                if(st.hasMoreTokens())
-                    preference = st.nextToken();
-
-                // autoLogin 체크되있을 경우 sharedpreference에 id, pw, check여부 저장
-                if(autoLoginChecked == true) {
-                    editor.putString("id", id);
-                    editor.putString("pw", pw);
-                    editor.putBoolean("autoLogin", true);
-                    editor.commit();
-                }
-
-                if(number != null && nickname != null && gender != null && birthday != null && city != null && created != null && preference != null) {
-                    Intent intent = new Intent(LoginActivity.this, ShowArticleActivity.class);
-                    intent.putExtra("number", Integer.parseInt(number));
-                    intent.putExtra("id", id);
-                    intent.putExtra("nickname", nickname);
-                    intent.putExtra("gender", gender);
-                    intent.putExtra("birthday", birthday);
-                    intent.putExtra("city", city);
-                    intent.putExtra("created", created);
-                    intent.putExtra("preference", preference);
-                    startActivityForResult(intent, request_login);
-                }
-            }
-        }
-
-
-        @Override
-        protected String doInBackground(String... params) {
-
-            id = (String)params[0];
-            pw = (String)params[1];
-
-            String serverURL = "http://115.71.236.22/login.php";
-            String postParameters = "id=" + id + "&pw=" + pw;
-
-
-            try {
-                URL url = new URL(serverURL);
-                HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
-
-                httpURLConnection.setReadTimeout(5000);
-                httpURLConnection.setConnectTimeout(5000);
-                httpURLConnection.setRequestMethod("POST");
-                //httpURLConnection.setRequestProperty("content-type", "application/json");
-                httpURLConnection.setDoInput(true);
-                httpURLConnection.connect();
-
-                OutputStream outputStream = httpURLConnection.getOutputStream();
-                outputStream.write(postParameters.getBytes("UTF-8"));
-                outputStream.flush();
-                outputStream.close();
-
-                int responseStatusCode = httpURLConnection.getResponseCode();
-
-                InputStream inputStream;
-                if(responseStatusCode == HttpURLConnection.HTTP_OK) {
-                    inputStream = httpURLConnection.getInputStream();
-                }
-                else{
-                    inputStream = httpURLConnection.getErrorStream();
-                }
-
-                InputStreamReader inputStreamReader = new InputStreamReader(inputStream, "UTF-8");
-                BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-
-                StringBuilder sb = new StringBuilder();
-                String line = null;
-
-                while((line = bufferedReader.readLine()) != null){
-                    sb.append(line);
-                }
-
-                bufferedReader.close();
-                return sb.toString();
-
-
-            } catch (Exception e) {
-                return new String("Insert Member Data Error: " + e.getMessage());
-            }
-        }
+        volley_queue.add(postRequest);
     }
 
 
     //퍼미션 관련 메소드
     static final int PERMISSIONS_REQUEST_CODE = 1000;
-    String[] PERMISSIONS  = {"android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION", "android.permission.CAMERA"};
+    String[] PERMISSIONS  = {"android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION", "android.permission.CAMERA",
+            "android.permission.WRITE_EXTERNAL_STORAGE", "android.permission.READ_EXTERNAL_STORAGE"};
 
     private boolean hasPermissions(String[] permissions) {
         int result;
@@ -324,6 +301,7 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
+    // 퍼미션 요청하는 다이얼로그
     @TargetApi(Build.VERSION_CODES.M)
     private void showDialogForPermission(String msg) {
 

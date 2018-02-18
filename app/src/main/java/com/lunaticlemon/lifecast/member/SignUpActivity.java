@@ -1,7 +1,6 @@
 package com.lunaticlemon.lifecast.member;
 
 import android.graphics.Color;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.text.Editable;
@@ -15,23 +14,31 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.lunaticlemon.lifecast.R;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 public class SignUpActivity extends AppCompatActivity {
+
+    String TAG = "SignUp";
 
     EditText edit_id, edit_pw, edit_nick;
     TextView textView_id_valid, textView_pw_valid, textView_nick_valid;
     RadioGroup radioGroup_gender;
     Spinner spinner_year, spinner_month, spinner_day, spinner_city;
+
+    // http request queue
+    RequestQueue volley_queue;
+
 
     // 회원가입 시 사용자가 입력하는 데이터
     // id : 6~12자의 영문 또는 숫자
@@ -46,6 +53,8 @@ public class SignUpActivity extends AppCompatActivity {
     int year, month, day;
     int year_count = -1, month_count = -1, day_count = -1, city_count = -1;
 
+
+    // spinner에 들어갈 정보
     Integer[] arr_year = new Integer[Calendar.getInstance().get(Calendar.YEAR) - 1949]; //  1950 ~ 현재 년도
     Integer[] arr_month = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};  // 1월 ~ 12월
     Integer[] arr_day = new Integer[31]; // 1일 ~ 31일
@@ -71,6 +80,7 @@ public class SignUpActivity extends AppCompatActivity {
         spinner_day = (Spinner) findViewById(R.id.spinner_day);
         spinner_city = (Spinner) findViewById(R.id.spinner_city);
 
+        volley_queue = Volley.newRequestQueue(this);
 
         edit_id.addTextChangedListener(new TextWatcher() {
 
@@ -84,8 +94,54 @@ public class SignUpActivity extends AppCompatActivity {
                 // id : 6~12자의 영문 또는 숫자
                 if(Pattern.matches("^[a-zA-Z0-9]{6,12}$", s.toString()))
                 {
-                    CheckDuplicate checkDuplicate_task = new CheckDuplicate();
-                    checkDuplicate_task.execute(s.toString() , "id");
+                    final String check_data = s.toString();
+
+                    // 서버와 http protocol을 이용하여 정보를 보내 사용자가 입력한 id 혹은 nickname 중복 확인
+                    // 1st parameter : 사용자가 입력한 id 혹은 nickname
+                    // 2nd parameter : 중복 확인하는 것이 id일 경우 id, nickname의 경우 nick
+                    // response (false : 중복없음 / true : 중복)
+                    String url = "http://115.71.236.22/check_duplicate.php";
+                    StringRequest postRequest = new StringRequest(Request.Method.POST, url,
+                            new Response.Listener<String>()
+                            {
+                                @Override
+                                public void onResponse(String response) {
+                                    if(response.equals("false"))
+                                    {
+                                        id_valid = true;
+                                        textView_id_valid.setText("valid");
+                                        textView_id_valid.setTextColor(Color.GREEN);
+                                    }
+                                    else if(response.equals("true"))
+                                    {
+                                        id_valid = false;
+                                        textView_id_valid.setText("already exist");
+                                        textView_id_valid.setTextColor(Color.RED);
+                                    }
+                                }
+                            },
+                            new Response.ErrorListener()
+                            {
+                                @Override
+                                public void onErrorResponse(VolleyError error) {
+                                    Toast.makeText(SignUpActivity.this, "다시 중복확인을 해주세요", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                    )
+                    {
+                        @Override
+                        protected Map<String, String> getParams()
+                        {
+                            Map<String, String>  params = new HashMap<String, String>();
+                            params.put("data", check_data);
+                            params.put("check", "id");
+
+                            return params;
+                        }
+                    };
+                    postRequest.setTag(TAG);
+
+                    volley_queue.add(postRequest);
                 }
                 else
                 {
@@ -143,8 +199,53 @@ public class SignUpActivity extends AppCompatActivity {
                 // nick : 숫자포함 2~5자 한글, 3~10자 영문,숫자
                 if(Pattern.matches("^[0-9가-힣]{2,5}$", s.toString()) || Pattern.matches("^[a-zA-Z0-9]{3,10}$", s.toString()) || Pattern.matches("^[0-9a-zA-Z가-힣]{2,7}$", s.toString()))
                 {
-                    CheckDuplicate checkDuplicate_task = new CheckDuplicate();
-                    checkDuplicate_task.execute(s.toString() , "nick");
+                    final String check_data = s.toString();
+
+                    // 서버와 http protocol을 이용하여 정보를 보내 사용자가 입력한 id 혹은 nickname 중복 확인
+                    // 1st parameter : 사용자가 입력한 id 혹은 nickname
+                    // 2nd parameter : 중복 확인하는 것이 id일 경우 id, nickname의 경우 nick
+                    String url = "http://115.71.236.22/check_duplicate.php";
+                    StringRequest postRequest = new StringRequest(Request.Method.POST, url,
+                            new Response.Listener<String>()
+                            {
+                                @Override
+                                public void onResponse(String response) {
+                                    if(response.equals("false"))
+                                    {
+                                        nick_valid = true;
+                                        textView_nick_valid.setText("valid");
+                                        textView_nick_valid.setTextColor(Color.GREEN);
+                                    }
+                                    else if(response.equals("true"))
+                                    {
+                                        nick_valid = false;
+                                        textView_nick_valid.setText("already exist");
+                                        textView_nick_valid.setTextColor(Color.RED);
+                                    }
+                                }
+                            },
+                            new Response.ErrorListener()
+                            {
+                                @Override
+                                public void onErrorResponse(VolleyError error) {
+                                    Toast.makeText(SignUpActivity.this, "다시 중복확인을 해주세요", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                    )
+                    {
+                        @Override
+                        protected Map<String, String> getParams()
+                        {
+                            Map<String, String>  params = new HashMap<String, String>();
+                            params.put("data", check_data);
+                            params.put("check", "nick");
+
+                            return params;
+                        }
+                    };
+                    postRequest.setTag(TAG);
+
+                    volley_queue.add(postRequest);
                 }
                 else
                 {
@@ -190,7 +291,7 @@ public class SignUpActivity extends AppCompatActivity {
         ArrayAdapter<String> adapter_city = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, arr_city);
 
         spinner_year.setAdapter(adapter_year);
-        spinner_year.setSelection(40);
+        spinner_year.setSelection(40);  // 초기 년도 설정
         spinner_month.setAdapter(adapter_month);
         spinner_day.setAdapter(adapter_day);
         spinner_city.setAdapter(adapter_city);
@@ -268,6 +369,16 @@ public class SignUpActivity extends AppCompatActivity {
         });
     }
 
+    @Override
+    public void onStop()
+    {
+        super.onStop();
+
+        // http request가 남아있을 시 모두 취소
+        if(volley_queue != null)
+            volley_queue.cancelAll(TAG);
+    }
+
     // 회원가입 버튼 클릭 시
     public void onClickSignUp(View v)
     {
@@ -287,9 +398,52 @@ public class SignUpActivity extends AppCompatActivity {
                         {
                             if(city_count > 0)
                             {
+                                // 서버와 http protocol을 이용하여 정보를 보내 database에 사용자 정보 추가
                                 // parameter : (id, pw, nickname, gender, year, month, day, city)
-                                InsertMemberData InsertMemberData_task = new InsertMemberData();
-                                InsertMemberData_task.execute(id, pw, nick, gender, Integer.toString(year), Integer.toString(month), Integer.toString(day), city);
+                                String url = "http://115.71.236.22/signup.php";
+                                StringRequest postRequest = new StringRequest(Request.Method.POST, url,
+                                        new Response.Listener<String>()
+                                        {
+                                            @Override
+                                            public void onResponse(String response) {
+                                                if(response.equals("success")) {
+                                                    // 회원가입 성공, LoginActivity로 돌아감
+                                                    Toast.makeText(SignUpActivity.this, "가입성공", Toast.LENGTH_SHORT).show();
+                                                    SignUpActivity.this.finish();
+                                                }
+                                                else {
+                                                    Toast.makeText(SignUpActivity.this, "가입실패", Toast.LENGTH_SHORT).show();
+                                                }
+                                            }
+                                        },
+                                        new Response.ErrorListener()
+                                        {
+                                            @Override
+                                            public void onErrorResponse(VolleyError error) {
+                                                Toast.makeText(SignUpActivity.this, "가입실패", Toast.LENGTH_SHORT).show();
+                                            }
+                                        }
+                                )
+                                {
+                                    @Override
+                                    protected Map<String, String> getParams()
+                                    {
+                                        // parameter : (id, pw, nickname, gender, year, month, day, city)
+                                        Map<String, String>  params = new HashMap<String, String>();
+                                        params.put("id", id);
+                                        params.put("pw", pw);
+                                        params.put("nickname", nick);
+                                        params.put("gender", gender);
+                                        params.put("birthday", Integer.toString(year) + "-" + Integer.toString(month) + "-" + Integer.toString(day));
+                                        params.put("city", city);
+
+                                        return params;
+                                    }
+                                };
+                                postRequest.setTag(TAG);
+
+                                volley_queue.add(postRequest);
+
                             }
                             else
                             {
@@ -328,198 +482,4 @@ public class SignUpActivity extends AppCompatActivity {
         SignUpActivity.this.finish();
     }
 
-
-    // 서버와 http protocol을 이용하여 정보를 보내 database에 사용자 정보 추가
-    // parameter : (id, pw, nickname, gender, year, month, day, city)
-    class InsertMemberData extends AsyncTask<String, Void, String> {
-
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-        }
-
-        @Override
-        protected void onPostExecute(String result) {
-            super.onPostExecute(result);
-
-            if(result.equals("success")) {
-                // 회원가입 성공, LoginActivity로 돌아감
-                Toast.makeText(SignUpActivity.this, "가입성공", Toast.LENGTH_SHORT).show();
-                SignUpActivity.this.finish();
-            }
-            else {
-                Toast.makeText(SignUpActivity.this, "가입실패", Toast.LENGTH_SHORT).show();
-            }
-        }
-
-
-        @Override
-        protected String doInBackground(String... params) {
-
-            String id = (String)params[0];
-            String pw = (String)params[1];
-            String nickname = (String)params[2];
-            String gender = (String)params[3];
-            String year = (String)params[4];
-            String month = (String)params[5];
-            String day = (String)params[6];
-            String city = (String)params[7];
-
-            String birthday = year + "-" + month + "-" + day;
-
-            //Log.d("insert", id+"/"+pw+"/"+nickname+"/"+gender+"/"+year+"/"+month+"/"+day+"/"+city);
-            String serverURL = "http://115.71.236.22/signup.php";
-            String postParameters = "id=" + id + "&pw=" + pw + "&nickname=" + nickname + "&gender=" + gender + "&birthday=" + birthday + "&city=" + city;
-
-
-            try {
-                URL url = new URL(serverURL);
-                HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
-
-                httpURLConnection.setReadTimeout(5000);
-                httpURLConnection.setConnectTimeout(5000);
-                httpURLConnection.setRequestMethod("POST");
-                //httpURLConnection.setRequestProperty("content-type", "application/json");
-                httpURLConnection.setDoInput(true);
-                httpURLConnection.connect();
-
-                OutputStream outputStream = httpURLConnection.getOutputStream();
-                outputStream.write(postParameters.getBytes("UTF-8"));
-                outputStream.flush();
-                outputStream.close();
-
-                int responseStatusCode = httpURLConnection.getResponseCode();
-
-                InputStream inputStream;
-                if(responseStatusCode == HttpURLConnection.HTTP_OK) {
-                    inputStream = httpURLConnection.getInputStream();
-                }
-                else{
-                    inputStream = httpURLConnection.getErrorStream();
-                }
-
-                InputStreamReader inputStreamReader = new InputStreamReader(inputStream, "UTF-8");
-                BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-
-                StringBuilder sb = new StringBuilder();
-                String line = null;
-
-                while((line = bufferedReader.readLine()) != null){
-                    sb.append(line);
-                }
-
-                bufferedReader.close();
-                return sb.toString();
-
-
-            } catch (Exception e) {
-                return new String("Insert Member Data Error: " + e.getMessage());
-            }
-        }
-    }
-
-    // 서버와 http protocol을 이용하여 정보를 보내 사용자가 입력한 id 혹은 nickname 중복 확인
-    // 1st parameter : 사용자가 입력한 id 혹은 nickname
-    // 2nd parameter : 중복 확인하는 것이 id일 경우 id, nickname의 경우 nick
-    class CheckDuplicate extends AsyncTask<String, Void, String> {
-
-        String check;
-
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-        }
-
-        @Override
-        protected void onPostExecute(String result) {
-            super.onPostExecute(result);
-
-            // result가 false 이면 중복되는 데이터가 없음 ,true이면 이미 존재하는 데이터임
-            if(result.equals("false"))
-            {
-                if(check.equals("id")) {
-                    id_valid = true;
-                    textView_id_valid.setText("valid");
-                    textView_id_valid.setTextColor(Color.GREEN);
-                }
-                else if(check.equals("nick"))
-                {
-                    nick_valid = true;
-                    textView_nick_valid.setText("valid");
-                    textView_nick_valid.setTextColor(Color.GREEN);
-                }
-            }
-            else if(result.equals("true"))
-            {
-                if(check.equals("id")) {
-                    id_valid = false;
-                    textView_id_valid.setText("already exist");
-                    textView_id_valid.setTextColor(Color.RED);
-                }
-                else if(check.equals("nick"))
-                {
-                    nick_valid = false;
-                    textView_nick_valid.setText("already exist");
-                    textView_nick_valid.setTextColor(Color.RED);
-                }
-            }
-
-        }
-
-
-        @Override
-        protected String doInBackground(String... params) {
-
-            String data = (String)params[0];    // 체크할 대상의 내용
-            check = (String)params[1];   // 중복 체크할 대상이 id인 경우 id, nick인 경우 nick 값을 가짐
-
-            String serverURL = "http://115.71.236.22/check_duplicate.php";
-            String postParameters = "data=" + data + "&check=" + check;
-
-
-            try {
-                URL url = new URL(serverURL);
-                HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
-
-                httpURLConnection.setReadTimeout(5000);
-                httpURLConnection.setConnectTimeout(5000);
-                httpURLConnection.setRequestMethod("POST");
-                //httpURLConnection.setRequestProperty("content-type", "application/json");
-                httpURLConnection.setDoInput(true);
-                httpURLConnection.connect();
-
-                OutputStream outputStream = httpURLConnection.getOutputStream();
-                outputStream.write(postParameters.getBytes("UTF-8"));
-                outputStream.flush();
-                outputStream.close();
-
-                int responseStatusCode = httpURLConnection.getResponseCode();
-
-                InputStream inputStream;
-                if(responseStatusCode == HttpURLConnection.HTTP_OK) {
-                    inputStream = httpURLConnection.getInputStream();
-                }
-                else{
-                    inputStream = httpURLConnection.getErrorStream();
-                }
-
-                InputStreamReader inputStreamReader = new InputStreamReader(inputStream, "UTF-8");
-                BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-
-                StringBuilder sb = new StringBuilder();
-                String line = null;
-
-                while((line = bufferedReader.readLine()) != null){
-                    sb.append(line);
-                }
-
-                bufferedReader.close();
-                return sb.toString();
-
-
-            } catch (Exception e) {
-                return new String("Error: " + e.getMessage());
-            }
-        }
-    }
 }

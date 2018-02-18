@@ -3,7 +3,6 @@ package com.lunaticlemon.lifecast.show_article;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.view.View;
@@ -13,19 +12,21 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Spinner;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.lunaticlemon.lifecast.R;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created by lemon on 2018-01-19.
@@ -34,10 +35,18 @@ import java.util.Calendar;
 public class Statistic_dialog extends Dialog {
     private Context con;
 
-    // 사용자가 선택한 분야, 날짜 및 사용자의 나이, 성별, 도시 정보
+    String TAG = "Statistic_dialog";
+
+    // http request queue
+    RequestQueue volley_queue;
+
+    // 사용자가 선택한 분야, 날짜
     private ShowArticleActivity.section selected_section;
-    private int selected_year, selected_month, selected_day, selected_age;
-    private String  selected_gender, selected_birthday, selected_city;
+    private int selected_year, selected_month, selected_day;
+
+    //사용자의 id, 나이, 성별, 도시 정보
+    private String user_id, user_gender, user_birthday, user_city;
+    private int user_age;
 
     private Spinner spinner_gender, spinner_age, spinner_city;
 
@@ -53,7 +62,7 @@ public class Statistic_dialog extends Dialog {
     ListView listview_news;
     News_Adapter news_adapter;
 
-    public Statistic_dialog(@NonNull Context context, ShowArticleActivity.section _section, int _year, int _month, int _day, String gender, String birthday, String city) {
+    public Statistic_dialog(@NonNull Context context, ShowArticleActivity.section _section, int _year, int _month, int _day, String _id, String _gender, String _birthday, String _city) {
         super(context);
 
         con = context;
@@ -61,15 +70,17 @@ public class Statistic_dialog extends Dialog {
         selected_year = _year;
         selected_month = _month;
         selected_day = _day;
-        selected_gender = gender;
-        selected_birthday = birthday;
-        selected_city = city;
+
+        user_id = _id;
+        user_gender = _gender;
+        user_birthday = _birthday;
+        user_city = _city;
 
         // 나이 구하기
         Calendar current = Calendar.getInstance();
         int currentYear  = current.get(Calendar.YEAR);
-        int user_birthYear = Integer.parseInt(birthday.substring(0,4));
-        selected_age = currentYear - user_birthYear + 1;
+        int user_birthYear = Integer.parseInt(user_birthday.substring(0,4));
+        user_age = currentYear - user_birthYear + 1;
 
         this.setCanceledOnTouchOutside(true); // 다이얼로그 바깥영역 터치시, 다이알로그 닫기
         this.setCancelable(true); // 백키로 다이얼로그 닫기
@@ -91,6 +102,8 @@ public class Statistic_dialog extends Dialog {
 
         setContentView(R.layout.statistic_dialog);
 
+        volley_queue = Volley.newRequestQueue(con);
+
         spinner_gender = (Spinner) findViewById(R.id.spinner_gender);
         spinner_age = (Spinner) findViewById(R.id.spinner_age);
         spinner_city = (Spinner) findViewById(R.id.spinner_city);
@@ -100,7 +113,7 @@ public class Statistic_dialog extends Dialog {
         ArrayAdapter<String> adapter_city = new ArrayAdapter<String>(con, android.R.layout.simple_spinner_dropdown_item, arr_city);
 
         spinner_gender.setAdapter(adapter_gender);
-        switch(selected_gender)
+        switch(user_gender)
         {
             case "male":
                 spinner_gender.setSelection(0);
@@ -111,27 +124,27 @@ public class Statistic_dialog extends Dialog {
         }
 
         spinner_age.setAdapter(adapter_age);
-        if(selected_age >= 10 && selected_age < 20)
+        if(user_age >= 10 && user_age < 20)
         {
             spinner_age.setSelection(0);
         }
-        else if(selected_age >= 20 && selected_age < 30)
+        else if(user_age >= 20 && user_age < 30)
         {
             spinner_age.setSelection(1);
         }
-        else if(selected_age >= 30 && selected_age < 40)
+        else if(user_age >= 30 && user_age < 40)
         {
             spinner_age.setSelection(2);
         }
-        else if(selected_age >= 40 && selected_age < 50)
+        else if(user_age >= 40 && user_age < 50)
         {
             spinner_age.setSelection(3);
         }
-        else if(selected_age >= 50 && selected_age < 60)
+        else if(user_age >= 50 && user_age < 60)
         {
             spinner_age.setSelection(4);
         }
-        else if(selected_age >= 60)
+        else if(user_age >= 60)
         {
             spinner_age.setSelection(5);
         }
@@ -143,7 +156,7 @@ public class Statistic_dialog extends Dialog {
         spinner_city.setAdapter(adapter_city);
         for(int i = 0;i<16;i++)
         {
-            if(selected_city.equals(arr_city[i])) {
+            if(user_city.equals(arr_city[i])) {
                 spinner_city.setSelection(i);
                 break;
             }
@@ -198,11 +211,41 @@ public class Statistic_dialog extends Dialog {
 
                 // web view에 해당 url 보여줌
                 Intent intent = new Intent(con, WebViewActivity.class);
-                intent.putExtra("url","http://" + news.getUrl());
+                switch(selected_section)
+                {
+                    case POLITIC:
+                        intent.putExtra("section", "politic");
+                        break;
+                    case ECONOMY:
+                        intent.putExtra("section", "economy");
+                        break;
+                    case SOCIETY:
+                        intent.putExtra("section", "society");
+                        break;
+                    case SPORT:
+                        intent.putExtra("section", "sport");
+                        break;
+                    case WORLD:
+                        intent.putExtra("section", "world");
+                        break;
+                    case CULTURE:
+                        intent.putExtra("section", "culture");
+                        break;
+                    case SCIENCE:
+                        intent.putExtra("section", "science");
+                        break;
+                    default:
+                        intent.putExtra("section", "politic");
+                        break;
+                }
+                intent.putExtra("url", news.getUrl());
+                intent.putExtra("news_id", news.getId());
+                intent.putExtra("user_id", user_id);
+                intent.putExtra("gender", user_gender);
+                intent.putExtra("birthday", user_birthday);
+                intent.putExtra("city", user_city);
                 con.startActivity(intent);
 
-
-                addView(selected_section, news.getUrl(), selected_gender, selected_birthday, selected_city);
                 //redirectUsingCustomTab(news.getUrl());
             }
         });
@@ -229,279 +272,147 @@ public class Statistic_dialog extends Dialog {
     }
 
     // 서버에서 해당 분야, 날짜에 사용자가 선택한 성별, 나이, 도시의 많이 본 뉴스를 가져옴
-    public void getNews(ShowArticleActivity.section selected_section, int selected_year, int selected_month, int selected_day, String gender, String age, String city){
+    public void getNews(final ShowArticleActivity.section selected_section, final int selected_year, final int selected_month, final int selected_day,
+                        final String _gender, final String _age, final String _city){
 
         // 1st parameter : 사용자가 선택한 분야
         // 2nd parameter : 사용자가 선택한 날짜
-        class GetNews extends AsyncTask<String, Void, String> {
+        String url = "http://115.71.236.22/get_statistic.php";
+        StringRequest postRequest = new StringRequest(Request.Method.POST, url,
+                new Response.Listener<String>()
+                {
+                    @Override
+                    public void onResponse(String response) {
+                        if(!response.equals("false")) {
+                            try {
+                                news_adapter.init();
 
-            @Override
-            protected String doInBackground(String... params) {
+                                JSONObject jsonObj = new JSONObject(response);
+                                JSONArray news_arr = jsonObj.getJSONArray("result");
 
-                String section = (String)params[0];
-                String date = (String) params[1];
-                String selected_gender = (String) params[2];
-                String selected_age = (String) params[3];
-                String selected_city = (String) params[4];
+                                for (int i = 0; i < news_arr.length(); i++) {
+                                    JSONObject news = news_arr.getJSONObject(i);
+                                    int id = news.getInt("id");
+                                    String keyword = news.getString("keyword");
+                                    String url = news.getString("url");
+                                    String title = news.getString("title");
+                                    String date = news.getString("date");
+                                    String newspaper = news.getString("newspaper");
+                                    int view = news.getInt("view");
 
-                String serverURL = "http://115.71.236.22/get_statistic.php";
-                String postParameters = "section=" + section + "&date=" + date + "&gender=" + selected_gender + "&age=" + selected_age + "&city=" + selected_city;
 
+                                    news_adapter.addItem(id, keyword, url, title, date, newspaper, view, "null");
+                                }
 
-                try {
-                    URL url = new URL(serverURL);
-                    HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
-
-                    httpURLConnection.setReadTimeout(5000);
-                    httpURLConnection.setConnectTimeout(5000);
-                    httpURLConnection.setRequestMethod("POST");
-                    //httpURLConnection.setRequestProperty("content-type", "application/json");
-                    httpURLConnection.setDoInput(true);
-                    httpURLConnection.connect();
-
-                    OutputStream outputStream = httpURLConnection.getOutputStream();
-                    outputStream.write(postParameters.getBytes("UTF-8"));
-                    outputStream.flush();
-                    outputStream.close();
-
-                    int responseStatusCode = httpURLConnection.getResponseCode();
-
-                    InputStream inputStream;
-                    if(responseStatusCode == HttpURLConnection.HTTP_OK) {
-                        inputStream = httpURLConnection.getInputStream();
+                                news_adapter.notifyDataSetChanged();
+                                listview_news.smoothScrollToPosition(0);
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                                news_adapter.notifyDataSetChanged();
+                            }
+                        }
                     }
-                    else{
-                        inputStream = httpURLConnection.getErrorStream();
+                },
+                new Response.ErrorListener()
+                {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
                     }
-
-                    InputStreamReader inputStreamReader = new InputStreamReader(inputStream, "UTF-8");
-                    BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-
-                    StringBuilder sb = new StringBuilder();
-                    String json;
-                    while((json = bufferedReader.readLine())!= null){
-                        sb.append(json+"\n");
-                    }
-
-                    return sb.toString().trim();
-
-                }catch(Exception e){
-                    return null;
                 }
-            }
-
+        )
+        {
             @Override
-            protected void onPostExecute(String result){
+            protected Map<String, String> getParams()
+            {
+                String date = selected_year + "-" + selected_month + "-" + selected_day;
+                String section, gender, age;
 
-                try {
-                    news_adapter.init();
-
-                    JSONObject jsonObj = new JSONObject(result);
-                    JSONArray news_arr = jsonObj.getJSONArray("result");
-
-                    for (int i = 0; i < news_arr.length(); i++) {
-                        JSONObject news = news_arr.getJSONObject(i);
-                        int id = news.getInt("id");
-                        String keyword = news.getString("keyword");
-                        String url = news.getString("url");
-                        String title = news.getString("title");
-                        String date = news.getString("date");
-                        String newspaper = news.getString("newspaper");
-                        int view = news.getInt("view");
-
-
-                        news_adapter.addItem(id, keyword, url, title, date, newspaper, view, "null");
-                    }
-
-                    news_adapter.notifyDataSetChanged();
-                    listview_news.smoothScrollToPosition( 0 );
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                    news_adapter.notifyDataSetChanged();
+                switch(selected_section)
+                {
+                    case POLITIC:
+                        section = "politic";
+                        break;
+                    case ECONOMY:
+                        section = "economy";
+                        break;
+                    case SOCIETY:
+                        section = "society";
+                        break;
+                    case SPORT:
+                        section = "sport";
+                        break;
+                    case WORLD:
+                        section = "world";
+                        break;
+                    case CULTURE:
+                        section = "culture";
+                        break;
+                    case SCIENCE:
+                        section = "science";
+                        break;
+                    default:
+                        section = "politic";
+                        break;
                 }
 
+                switch(_gender)
+                {
+                    case "남성":
+                        gender = "male";
+                        break;
+                    case "여성":
+                        gender = "female";
+                        break;
+                    case "선택안함":
+                        gender = "none";
+                        break;
+                    default:
+                        gender = user_gender;
+                        break;
+                }
+
+                switch(_age)
+                {
+                    case "10대":
+                        age = "10";
+                        break;
+                    case "20대":
+                        age = "20";
+                        break;
+                    case "30대":
+                        age = "30";
+                        break;
+                    case "40대":
+                        age = "40";
+                        break;
+                    case "50대":
+                        age = "50";
+                        break;
+                    case "60대 이상":
+                        age = "60";
+                        break;
+                    case "선택안함":
+                        age = "none";
+                        break;
+                    default:
+                        age = Integer.toString(user_age);
+                        break;
+                }
+
+                Map<String, String>  params = new HashMap<String, String>();
+                params.put("section", section);
+                params.put("date", date);
+                params.put("gender", gender);
+                params.put("age", age);
+                params.put("city", _city);
+
+                return params;
             }
-        }
+        };
+        postRequest.setTag(TAG);
 
-        String date = selected_year + "-" + selected_month + "-" + selected_day;
-        String section;
-        switch(selected_section)
-        {
-            case POLITIC:
-                section = "politic";
-                break;
-            case ECONOMY:
-                section = "economy";
-                break;
-            case SOCIETY:
-                section = "society";
-                break;
-            case SPORT:
-                section = "sport";
-                break;
-            case WORLD:
-                section = "world";
-                break;
-            case CULTURE:
-                section = "culture";
-                break;
-            case SCIENCE:
-                section = "science";
-                break;
-            default:
-                section = "politic";
-                break;
-        }
+        volley_queue.add(postRequest);
 
-        switch(gender)
-        {
-            case "남성":
-                gender = "male";
-                break;
-            case "여성":
-                gender = "female";
-                break;
-            case "선택안함":
-                gender = "none";
-                break;
-        }
-
-        switch(age)
-        {
-            case "10대":
-                age = "10";
-                break;
-            case "20대":
-                age = "20";
-                break;
-            case "30대":
-                age = "30";
-                break;
-            case "40대":
-                age = "40";
-                break;
-            case "50대":
-                age = "50";
-                break;
-            case "60대 이상":
-                age = "60";
-                break;
-            case "선택안함":
-                age = "none";
-                break;
-
-        }
-
-        if(city.equals("선택안함"))
-            city = "none";
-
-
-        GetNews GetNews_Task = new GetNews();
-        GetNews_Task.execute(section, date, gender, age, city);
     }
 
-    public void addView(ShowArticleActivity.section selected_section, String _url, String _gender, String _birthday, String _city){
-
-        // 서버와 http protocol을 이용하여 사용자가 선택한 뉴스의 조회수 증가
-        // 1st parameter : 사용자가 선택한 분야
-        // 2nd parameter : 사용자가 선택한 기사의 url
-        // 3rd parameter : 사용자의 성별
-        // 4th parameter : 사용자의 생일
-        // 5th parameter : 사용자의 도시
-        class AddViewData extends AsyncTask<String, Void, String>{
-
-            @Override
-            protected String doInBackground(String... params) {
-
-                String section = (String)params[0];
-                String _url = (String)params[1];
-                String gender = (String)params[2];
-                String birthday = (String)params[3];
-                String city = (String)params[4];
-
-                String serverURL = "http://115.71.236.22/add_view.php";
-                String postParameters = "section=" + section + "&url=" + _url +"&gender=" + gender + "&birthday=" + birthday + "&city=" + city;
-
-                try {
-                    URL url = new URL(serverURL);
-                    HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
-
-                    httpURLConnection.setReadTimeout(5000);
-                    httpURLConnection.setConnectTimeout(5000);
-                    httpURLConnection.setRequestMethod("POST");
-                    //httpURLConnection.setRequestProperty("content-type", "application/json");
-                    httpURLConnection.setDoInput(true);
-                    httpURLConnection.connect();
-
-                    OutputStream outputStream = httpURLConnection.getOutputStream();
-                    outputStream.write(postParameters.getBytes("UTF-8"));
-                    outputStream.flush();
-                    outputStream.close();
-
-                    int responseStatusCode = httpURLConnection.getResponseCode();
-
-                    InputStream inputStream;
-                    if(responseStatusCode == HttpURLConnection.HTTP_OK) {
-                        inputStream = httpURLConnection.getInputStream();
-                    }
-                    else{
-                        inputStream = httpURLConnection.getErrorStream();
-                    }
-
-                    InputStreamReader inputStreamReader = new InputStreamReader(inputStream, "UTF-8");
-                    BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-
-                    StringBuilder sb = new StringBuilder();
-                    String line = null;
-
-                    while((line = bufferedReader.readLine()) != null){
-                        sb.append(line);
-                    }
-
-                    bufferedReader.close();
-                    return sb.toString();
-
-
-                } catch (Exception e) {
-                    return new String("add view Error: " + e.getMessage());
-                }
-            }
-
-            @Override
-            protected void onPostExecute(String result){
-            }
-        }
-
-        String section;
-        switch(selected_section)
-        {
-            case POLITIC:
-                section = "politic";
-                break;
-            case ECONOMY:
-                section = "economy";
-                break;
-            case SOCIETY:
-                section = "society";
-                break;
-            case SPORT:
-                section = "sport";
-                break;
-            case WORLD:
-                section = "world";
-                break;
-            case CULTURE:
-                section = "culture";
-                break;
-            case SCIENCE:
-                section = "science";
-                break;
-            default:
-                section = "politic";
-                break;
-        }
-
-        AddViewData AddView_Task = new AddViewData();
-        AddView_Task.execute(section, _url, _gender, _birthday, _city);
-    }
 }

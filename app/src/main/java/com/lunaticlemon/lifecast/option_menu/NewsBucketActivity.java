@@ -2,7 +2,6 @@ package com.lunaticlemon.lifecast.option_menu;
 
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -11,6 +10,12 @@ import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.lunaticlemon.lifecast.R;
 import com.lunaticlemon.lifecast.show_article.News;
 import com.lunaticlemon.lifecast.show_article.News_Adapter;
@@ -20,24 +25,29 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 
 public class NewsBucketActivity extends AppCompatActivity {
+
+    String TAG = "NewsBucket";
+
+    // http request queue
+    RequestQueue volley_queue;
 
     ListView listview_news;
     News_Adapter news_adapter;
 
+
+    // 데이터베이스의 member table의 number
     int user_number;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_news_bucket);
+
+        volley_queue = Volley.newRequestQueue(this);
 
         user_number = getIntent().getExtras().getInt("number");
 
@@ -74,7 +84,7 @@ public class NewsBucketActivity extends AppCompatActivity {
                         .setCancelable(false)
                         .setPositiveButton("예",new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog,int id) {
-                                addBucket(news.getSection(), user_number, news.getId());
+                                deleteBucket(news.getSection(), user_number, news.getId());
                                 news_adapter.deleteItem(news.getId());
                                 news_adapter.notifyDataSetChanged();
                                 dialog.cancel();
@@ -100,163 +110,120 @@ public class NewsBucketActivity extends AppCompatActivity {
         getNews(Integer.toString(user_number));
     }
 
-    // 서버에서 news를 가져와 listview에 넣어주는 함수
-    public void getNews(String user_number){
+    @Override
+    public void onStop()
+    {
+        super.onStop();
+
+        // http request가 남아있을 시 모두 취소
+        if(volley_queue != null)
+            volley_queue.cancelAll(TAG);
+    }
+
+    // 데이터베이스에서 사용자가 보관함에 담은 news를 가져와 listview에 넣어주는 함수
+    public void getNews(final String user_number){
 
         // 서버와 http protocol을 이용하여 사용자 보관함의 뉴스를 가져옴
         // 1st parameter : 사용자의 number
+        String url = "http://115.71.236.22/get_bucketnews.php";
+        StringRequest postRequest = new StringRequest(Request.Method.POST, url,
+                new Response.Listener<String>()
+                {
+                    @Override
+                    public void onResponse(String response) {
+                        try {
+                            JSONObject jsonObj = new JSONObject(response.toString());
+                            JSONArray news_arr = jsonObj.getJSONArray("result");
 
-        class GetNewsData extends AsyncTask<String, Void, String> {
+                            for (int i = 0; i < news_arr.length(); i++) {
+                                JSONObject news = news_arr.getJSONObject(i);
+                                int id = news.getInt("id");
+                                String keyword = news.getString("keyword");
+                                String url = news.getString("url");
+                                String title = news.getString("title");
+                                String date = news.getString("date");
+                                String newspaper = news.getString("newspaper");
+                                int view = news.getInt("view");
+                                String section = news.getString("section");
 
-            @Override
-            protected String doInBackground(String... params) {
+                                news_adapter.addItem(id, keyword, url, title, date, newspaper, view, section);
+                            }
 
-                String user_number = (String)params[0];
-
-                String serverURL = "http://115.71.236.22/get_bucketnews.php";
-                String postParameters = "user_number=" + user_number;
-                try {
-                    URL url = new URL(serverURL);
-                    HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
-
-                    httpURLConnection.setReadTimeout(5000);
-                    httpURLConnection.setConnectTimeout(5000);
-                    httpURLConnection.setRequestMethod("POST");
-                    //httpURLConnection.setRequestProperty("content-type", "application/json");
-                    httpURLConnection.setDoInput(true);
-                    httpURLConnection.connect();
-
-                    OutputStream outputStream = httpURLConnection.getOutputStream();
-                    outputStream.write(postParameters.getBytes("UTF-8"));
-                    outputStream.flush();
-                    outputStream.close();
-
-                    int responseStatusCode = httpURLConnection.getResponseCode();
-
-                    InputStream inputStream;
-                    if(responseStatusCode == HttpURLConnection.HTTP_OK) {
-                        inputStream = httpURLConnection.getInputStream();
+                            news_adapter.notifyDataSetChanged();
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
                     }
-                    else{
-                        inputStream = httpURLConnection.getErrorStream();
+                },
+                new Response.ErrorListener()
+                {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        getNews(user_number);
                     }
-
-                    InputStreamReader inputStreamReader = new InputStreamReader(inputStream, "UTF-8");
-                    BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-
-                    StringBuilder sb = new StringBuilder();
-                    String json;
-                    while((json = bufferedReader.readLine())!= null){
-                        sb.append(json+"\n");
-                    }
-
-                    return sb.toString().trim();
-
-                }catch(Exception e){
-                    return null;
                 }
-            }
-
+        )
+        {
             @Override
-            protected void onPostExecute(String result){
-                try {
-                    JSONObject jsonObj = new JSONObject(result);
-                    JSONArray news_arr = jsonObj.getJSONArray("result");
+            protected Map<String, String> getParams()
+            {
+                Map<String, String>  params = new HashMap<String, String>();
+                params.put("user_number", user_number);
 
-                    for (int i = 0; i < news_arr.length(); i++) {
-                        JSONObject news = news_arr.getJSONObject(i);
-                        int id = news.getInt("id");
-                        String keyword = news.getString("keyword");
-                        String url = news.getString("url");
-                        String title = news.getString("title");
-                        String date = news.getString("date");
-                        String newspaper = news.getString("newspaper");
-                        int view = news.getInt("view");
-                        String section = news.getString("section");
-
-                        news_adapter.addItem(id, keyword, url, title, date, newspaper, view, section);
-                    }
-
-                    news_adapter.notifyDataSetChanged();
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
+                return params;
             }
-        }
+        };
+        postRequest.setTag(TAG);
 
-        GetNewsData GetNewsData_Task = new GetNewsData();
-        GetNewsData_Task.execute(user_number);
+        volley_queue.add(postRequest);
     }
 
-    public void addBucket(String selected_section, int user_number, int news_id){
+    public void deleteBucket(final String selected_section, final int user_number, final int news_id){
 
         // 서버와 http protocol을 이용하여 사용자가 선택한 뉴스를 사용자의 보관함에 넣음
         // 1st parameter : 사용자가 선택한 분야
         // 2nd parameter : 사용자의 number
         // 3rd parameter : 뉴스의 id
-        class AddBucketData extends AsyncTask<String, Void, String>{
+        // 4th parameter : 추가 시 add / 삭제 시 delete
+        // response : (success : 삭제 성공 / fail : 삭제 실패)
 
-            @Override
-            protected String doInBackground(String... params) {
-
-                String section = (String)params[0];
-                String user_number = (String)params[1];
-                String news_id = (String)params[2];
-
-                String serverURL = "http://115.71.236.22/add_bucket.php";
-                String postParameters = "section=" + section + "&user_number=" + user_number +"&news_id=" + news_id + "&action=" + "delete";
-                try {
-                    URL url = new URL(serverURL);
-                    HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
-
-                    httpURLConnection.setReadTimeout(5000);
-                    httpURLConnection.setConnectTimeout(5000);
-                    httpURLConnection.setRequestMethod("POST");
-                    //httpURLConnection.setRequestProperty("content-type", "application/json");
-                    httpURLConnection.setDoInput(true);
-                    httpURLConnection.connect();
-
-                    OutputStream outputStream = httpURLConnection.getOutputStream();
-                    outputStream.write(postParameters.getBytes("UTF-8"));
-                    outputStream.flush();
-                    outputStream.close();
-
-                    int responseStatusCode = httpURLConnection.getResponseCode();
-
-                    InputStream inputStream;
-                    if(responseStatusCode == HttpURLConnection.HTTP_OK) {
-                        inputStream = httpURLConnection.getInputStream();
+        String url = "http://115.71.236.22/add_bucket.php";
+        StringRequest postRequest = new StringRequest(Request.Method.POST, url,
+                new Response.Listener<String>()
+                {
+                    @Override
+                    public void onResponse(String response) {
+                        if(response.equals("success"))
+                        {
+                            Toast.makeText(NewsBucketActivity.this, "삭제 성공", Toast.LENGTH_SHORT).show();
+                        }
+                        else if(response.equals("fail"))
+                        {
+                            Toast.makeText(NewsBucketActivity.this, "삭제 실패", Toast.LENGTH_SHORT).show();
+                        }
                     }
-                    else{
-                        inputStream = httpURLConnection.getErrorStream();
+                },
+                new Response.ErrorListener()
+                {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
                     }
-
-                    InputStreamReader inputStreamReader = new InputStreamReader(inputStream, "UTF-8");
-                    BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-
-                    StringBuilder sb = new StringBuilder();
-                    String line = null;
-
-                    while((line = bufferedReader.readLine()) != null){
-                        sb.append(line);
-                    }
-
-                    bufferedReader.close();
-                    return sb.toString();
-
-
-                } catch (Exception e) {
-                    return new String("add bucket Error: " + e.getMessage());
                 }
-            }
-
+        )
+        {
             @Override
-            protected void onPostExecute(String result){
-                Toast.makeText(NewsBucketActivity.this, "삭제 성공", Toast.LENGTH_SHORT).show();
+            protected Map<String, String> getParams()
+            {
+                Map<String, String>  params = new HashMap<String, String>();
+                params.put("section", selected_section);
+                params.put("user_number", Integer.toString(user_number));
+                params.put("news_id", Integer.toString(news_id));
+                params.put("action", "delete");
+                return params;
             }
-        }
+        };
+        postRequest.setTag(TAG);
 
-        AddBucketData AddBucket_Task = new AddBucketData();
-        AddBucket_Task.execute(selected_section, Integer.toString(user_number), Integer.toString(news_id));
+        volley_queue.add(postRequest);
     }
 }

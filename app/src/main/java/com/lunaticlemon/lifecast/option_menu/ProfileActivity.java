@@ -2,7 +2,6 @@ package com.lunaticlemon.lifecast.option_menu;
 
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -11,14 +10,16 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.lunaticlemon.lifecast.R;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import static com.lunaticlemon.lifecast.member.LoginActivity.result_withdraw;
@@ -27,17 +28,26 @@ import static com.lunaticlemon.lifecast.show_article.ShowArticleActivity.result_
 
 public class ProfileActivity extends AppCompatActivity {
 
+    String TAG = "Profile";
+
     TextView textView_id, textView_nick, textView_nickchange;
     TextView textView_gender, textView_birthday, textView_created, textView_city;
     TextView textView_pwchange, textView_withdraw;
 
+    // http request queue
+    RequestQueue volley_queue;
+
+    // 사용자 정보
     String id, nickname, gender, birthday, city, created;
+
     Boolean isNickChanged = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_profile);
+
+        volley_queue = Volley.newRequestQueue(this);
 
         id = getIntent().getExtras().getString("id");
         nickname = getIntent().getExtras().getString("nickname");
@@ -152,6 +162,16 @@ public class ProfileActivity extends AppCompatActivity {
     }
 
     @Override
+    public void onStop()
+    {
+        super.onStop();
+
+        // http request가 남아있을 시 모두 취소
+        if(volley_queue != null)
+            volley_queue.cancelAll(TAG);
+    }
+
+    @Override
     public void onBackPressed()
     {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -159,6 +179,8 @@ public class ProfileActivity extends AppCompatActivity {
         builder.setPositiveButton("예",new DialogInterface.OnClickListener(){
             public void onClick(DialogInterface dialog, int whichButton)
             {
+                // 사용자가 닉네임 변경했을 시 ShowArticleActivity의 nickname 정보 변경
+                // ShowArticleActivity의 onActivityResult 확인
                 if(isNickChanged) {
                     setResult(result_nickchange, new Intent().putExtra("nick",nickname));
                 }
@@ -180,115 +202,83 @@ public class ProfileActivity extends AppCompatActivity {
     // 닉네임 변경 시 : (action = nick, id = 사용자의 아이디, changed = 변경할 닉)
     // 비밀번호 변경 시 : (action = pw, id = 사용자의 아이디, changed = 변경할 비밀번호)
     // 회원탈퇴 시 : (action = withdraw, id = 사용자의 아이디, changed = null)
-    public void change_userdata(String action, String id, String changed){
+    public void change_userdata(final String action, final String id, final String changed){
 
         // 서버와 http protocol을 이용하여 사용자 정보 변경
         // 1st parameter : action
         // 2nd parameter : id
         // 3rd parameter : changed
-        class Change_userdata extends AsyncTask<String, Void, String> {
-
-            String action, changed;
-
-            @Override
-            protected String doInBackground(String... params) {
-
-                action = (String)params[0];
-                String id = (String) params[1];
-                changed = (String) params[2];
-
-                String serverURL = "http://115.71.236.22/change_userdata.php";
-                String postParameters = "action=" + action + "&id=" + id + "&changed=" + changed;
-
-
-                try {
-                    URL url = new URL(serverURL);
-                    HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
-
-                    httpURLConnection.setReadTimeout(5000);
-                    httpURLConnection.setConnectTimeout(5000);
-                    httpURLConnection.setRequestMethod("POST");
-                    //httpURLConnection.setRequestProperty("content-type", "application/json");
-                    httpURLConnection.setDoInput(true);
-                    httpURLConnection.connect();
-
-                    OutputStream outputStream = httpURLConnection.getOutputStream();
-                    outputStream.write(postParameters.getBytes("UTF-8"));
-                    outputStream.flush();
-                    outputStream.close();
-
-                    int responseStatusCode = httpURLConnection.getResponseCode();
-
-                    InputStream inputStream;
-                    if(responseStatusCode == HttpURLConnection.HTTP_OK) {
-                        inputStream = httpURLConnection.getInputStream();
-                    }
-                    else{
-                        inputStream = httpURLConnection.getErrorStream();
-                    }
-
-                    InputStreamReader inputStreamReader = new InputStreamReader(inputStream, "UTF-8");
-                    BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-
-                    StringBuilder sb = new StringBuilder();
-                    String json;
-                    while((json = bufferedReader.readLine())!= null){
-                        sb.append(json+"\n");
-                    }
-
-                    return sb.toString().trim();
-
-                }catch(Exception e){
-                    return null;
-                }
-            }
-
-            @Override
-            protected void onPostExecute(String result){
-                switch(action)
+        // response (success : action 성공 / fail : action 실패)
+        String url = "http://115.71.236.22/change_userdata.php";
+        StringRequest postRequest = new StringRequest(Request.Method.POST, url,
+                new Response.Listener<String>()
                 {
-                    case "nick":
-                        if(result.equals("success"))    // 변경 성공
+                    @Override
+                    public void onResponse(String response) {
+                        switch(action)
                         {
-                            Toast.makeText(ProfileActivity.this, "변경 성공", Toast.LENGTH_SHORT).show();
-                            textView_nick.setText(changed);
-                            nickname = changed;
-                            isNickChanged = true;
+                            case "nick":
+                                if(response.equals("success"))    // 변경 성공
+                                {
+                                    Toast.makeText(ProfileActivity.this, "변경 성공", Toast.LENGTH_SHORT).show();
+                                    textView_nick.setText(changed);
+                                    nickname = changed;
+                                    isNickChanged = true;
+                                }
+                                else if(response.equals("fail"))    // 중복되는 닉네임 존재
+                                {
+                                    Toast.makeText(ProfileActivity.this, "중복된 닉네임입니다.", Toast.LENGTH_SHORT).show();
+                                }
+                                break;
+                            case "pw":
+                                if(response.equals("success"))    // 변경 성공
+                                {
+                                    Toast.makeText(ProfileActivity.this, "변경 성공", Toast.LENGTH_SHORT).show();
+                                    setResult(result_pwchange);
+                                    finish();
+                                }
+                                else if(response.equals("fail")) // 변경 실패
+                                {
+                                    Toast.makeText(ProfileActivity.this, "변경 실패", Toast.LENGTH_SHORT).show();
+                                }
+                                break;
+                            case "withdraw":
+                                if(response.equals("success"))    // 탈퇴 성공
+                                {
+                                    Toast.makeText(ProfileActivity.this, "탈퇴 성공", Toast.LENGTH_SHORT).show();
+                                    setResult(result_withdraw);
+                                    finish();
+                                }
+                                else if(response.equals("fail")) // 탈퇴 실패
+                                {
+                                    Toast.makeText(ProfileActivity.this, "탈퇴 실패", Toast.LENGTH_SHORT).show();
+                                }
+                                break;
                         }
-                        else // 중복되는 닉네임 존재
-                        {
-                            Toast.makeText(ProfileActivity.this, "중복된 닉네임입니다.", Toast.LENGTH_SHORT).show();
-                        }
-                        break;
-                    case "pw":
-                        if(result.equals("success"))    // 변경 성공
-                        {
-                            Toast.makeText(ProfileActivity.this, "변경 성공", Toast.LENGTH_SHORT).show();
-                            setResult(result_pwchange);
-                            finish();
-                        }
-                        else // 변경 실패
-                        {
-                            Toast.makeText(ProfileActivity.this, "변경 실패", Toast.LENGTH_SHORT).show();
-                        }
-                        break;
-                    case "withdraw":
-                        if(result.equals("success"))    // 탈퇴 성공
-                        {
-                            Toast.makeText(ProfileActivity.this, "탈퇴 성공", Toast.LENGTH_SHORT).show();
-                            setResult(result_withdraw);
-                            finish();
-                        }
-                        else // 탈퇴 실패
-                        {
-                            Toast.makeText(ProfileActivity.this, "탈퇴 실패", Toast.LENGTH_SHORT).show();
-                        }
-                        break;
+                    }
+                },
+                new Response.ErrorListener()
+                {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        Toast.makeText(ProfileActivity.this, "다시 중복확인을 해주세요", Toast.LENGTH_SHORT).show();
+                    }
                 }
-            }
-        }
+        )
+        {
+            @Override
+            protected Map<String, String> getParams()
+            {
+                Map<String, String>  params = new HashMap<String, String>();
+                params.put("action", action);
+                params.put("id", id);
+                params.put("changed", changed);
 
-        Change_userdata change_userdata_Task = new Change_userdata();
-        change_userdata_Task.execute(action, id, changed);
+                return params;
+            }
+        };
+        postRequest.setTag(TAG);
+
+        volley_queue.add(postRequest);
     }
 }

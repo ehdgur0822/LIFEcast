@@ -1,13 +1,12 @@
 package com.lunaticlemon.lifecast.show_article;
 
 import android.app.DatePickerDialog;
+import android.content.ActivityNotFoundException;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Typeface;
-import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.customtabs.CustomTabsIntent;
+import android.speech.RecognizerIntent;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SearchView;
@@ -22,24 +21,29 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.chabbal.slidingdotsplash.OnItemClickListener;
 import com.chabbal.slidingdotsplash.SlidingSplashView;
 import com.lunaticlemon.lifecast.R;
 import com.lunaticlemon.lifecast.camera.CameraActivity;
 import com.lunaticlemon.lifecast.option_menu.NewsBucketActivity;
 import com.lunaticlemon.lifecast.option_menu.ProfileActivity;
+import com.lunaticlemon.lifecast.paint.PaintActivity;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 import zh.wang.android.yweathergetter4a.WeatherInfo;
 import zh.wang.android.yweathergetter4a.YahooWeather;
@@ -58,9 +62,14 @@ import static com.lunaticlemon.lifecast.show_article.ShowArticleActivity.section
 
 public class ShowArticleActivity extends AppCompatActivity implements YahooWeatherInfoListener {
 
-    public static int request_showarticle = 3001;
+    public static int request_showarticle = 3001, request_speach = 3002;
     public static int result_nickchange = 4001, result_pwchange = 4002;
     public enum section {POLITIC, ECONOMY, SOCIETY, SPORT, WORLD, CULTURE, SCIENCE};
+
+    String TAG = "ShowArticle";
+
+    // http request queue
+    RequestQueue volley_queue;
 
     DatePickerDialog datePickerDialog;
     YahooWeather mYahooWeather = YahooWeather.getInstance(5000, true);
@@ -94,6 +103,8 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_show_article);
 
+        volley_queue = Volley.newRequestQueue(this);
+
         user_number = getIntent().getExtras().getInt("number");
         id = getIntent().getExtras().getString("id");
         nickname = getIntent().getExtras().getString("nickname");
@@ -102,6 +113,9 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
         city = getIntent().getExtras().getString("city");
         created = getIntent().getExtras().getString("created");
         preference = getIntent().getExtras().getString("preference");
+
+        // 사용자 접속 사실 nosql에 저장
+        save_log("in", id);
 
         // 사용자의 선호 분야를 가장먼저 보여주기 위해 section 초기화
         switch(preference)
@@ -202,7 +216,7 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
         datePickerDialog = new DatePickerDialog(this, new DatePickerDialog.OnDateSetListener() {
             public void onDateSet(DatePicker view, int year, int monthOfYear, int dayOfMonth) {
                 // 사용자가 선택한 날짜 표시
-                textView_date.setText(year + " / " + monthOfYear+1 + " / " + dayOfMonth);
+                textView_date.setText(year + " / " + Integer.toString(monthOfYear+1) + " / " + dayOfMonth);
 
                 // 사용자가 선택한 날짜 변경
                 selected_year = year;
@@ -249,7 +263,7 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
         }
 
         // 오늘 날짜와 현재 날씨로 초기화
-        textView_date.setText(Calendar.getInstance().get(Calendar.YEAR) + " / " + Calendar.getInstance().get(Calendar.MONTH)+1 + " / " + Calendar.getInstance().get(Calendar.DAY_OF_MONTH));
+        textView_date.setText(Calendar.getInstance().get(Calendar.YEAR) + " / " + Integer.toString(Calendar.getInstance().get(Calendar.MONTH)+1) + " / " + Calendar.getInstance().get(Calendar.DAY_OF_MONTH));
         this.searchByGPS();
 
 
@@ -267,11 +281,14 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
                         keyword_dialog.show();
                         break;
                     case 1: // 사용자가 선택한 성별, 나이, 도시에서 인기있는 뉴스 보여주기
-                        statistic_dialog = new Statistic_dialog(ShowArticleActivity.this, cur_selected_section, selected_year, selected_month, selected_day, gender, birthday, city);
+                        statistic_dialog = new Statistic_dialog(ShowArticleActivity.this, cur_selected_section, selected_year, selected_month, selected_day, id, gender, birthday, city);
                         statistic_dialog.show();
                         break;
                     case 2: // 지역 뉴스 보여주기
                         Intent intent = new Intent(ShowArticleActivity.this, MapActivity.class);
+                        intent.putExtra("user_id", id);
+                        intent.putExtra("gender", gender);
+                        intent.putExtra("birthday", birthday);
                         intent.putExtra("city",city);
                         intent.putExtra("selected_year",selected_year);
                         intent.putExtra("selected_month",selected_month);
@@ -291,15 +308,46 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
         listview_news.setOnItemClickListener(new AdapterView.OnItemClickListener() {
 
             @Override
-            public void onItemClick(AdapterView<?> arg0, View arg1, int position, long id) {
+            public void onItemClick(AdapterView<?> arg0, View arg1, int position, long _id) {
                 News news = (News)listview_news.getItemAtPosition(position);
 
                 // web view에 해당 url 보여줌
                 Intent intent = new Intent(ShowArticleActivity.this, WebViewActivity.class);
-                intent.putExtra("url","http://" + news.getUrl());
+                switch(cur_selected_section)
+                {
+                    case POLITIC:
+                        intent.putExtra("section", "politic");
+                        break;
+                    case ECONOMY:
+                        intent.putExtra("section", "economy");
+                        break;
+                    case SOCIETY:
+                        intent.putExtra("section", "society");
+                        break;
+                    case SPORT:
+                        intent.putExtra("section", "sport");
+                        break;
+                    case WORLD:
+                        intent.putExtra("section", "world");
+                        break;
+                    case CULTURE:
+                        intent.putExtra("section", "culture");
+                        break;
+                    case SCIENCE:
+                        intent.putExtra("section", "science");
+                        break;
+                    default:
+                        intent.putExtra("section", "politic");
+                        break;
+                }
+                intent.putExtra("url", news.getUrl());
+                intent.putExtra("news_id", news.getId());
+                intent.putExtra("user_id", id);
+                intent.putExtra("gender", gender);
+                intent.putExtra("birthday", birthday);
+                intent.putExtra("city", city);
                 startActivity(intent);
 
-                addView(cur_selected_section, news.getUrl(), gender, birthday, city);
                 //redirectUsingCustomTab(news.getUrl());
             }
         });
@@ -362,12 +410,7 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
         getMenuInflater().inflate(R.menu.actionbar, menu);
 
         // action bar에 검색창 생성
-//        SearchManager manager = (SearchManager) getSystemService(Context.SEARCH_SERVICE);
-//        SearchView search = (SearchView) menu.findItem(R.id.search).getActionView();
-//        search.setSearchableInfo(manager.getSearchableInfo(getComponentName()));
-
-
-        MenuItem searchMenuItem = menu.findItem(R.id.search);
+        MenuItem searchMenuItem = menu.findItem(R.id.text_search);
         SearchView searchView = (SearchView) searchMenuItem.getActionView();
         if (searchView != null) {
             searchView.setQueryHint("검색어 입력");
@@ -396,6 +439,9 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
     public boolean onOptionsItemSelected(MenuItem item){
         switch (item.getItemId())
         {
+            case R.id.vocal_search:
+                promptSpeechInput();
+                return true;
             case R.id.profile_btn:
                 Intent intent_profile = new Intent(ShowArticleActivity.this, ProfileActivity.class);
                 intent_profile.putExtra("id",id);
@@ -415,13 +461,25 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
                 setResult(result_logout);
                 finish();
                 return true;
-            case R.id.example_btn:
+            case R.id.camera_btn:
                 Intent intent_camera= new Intent(ShowArticleActivity.this, CameraActivity.class);
                 startActivity(intent_camera);
+                return true;
+            case R.id.text_btn:
+                Intent intent_text= new Intent(ShowArticleActivity.this, PaintActivity.class);
+                startActivity(intent_text);
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
+    }
+
+    @Override
+    public void onDestroy()
+    {
+        super.onDestroy();
+        // 사용자 접속 사실 nosql에 저장
+        save_log("out", id);
     }
 
     @Override
@@ -452,20 +510,30 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
         super.onActivityResult(requestCode,resultCode,data);
 
         if(requestCode == request_showarticle) {
-            if (resultCode == result_withdraw)    // exit
+            if (resultCode == result_withdraw)
             {
+                // ProfileActivity에서 회원 탈퇴 시
                 setResult(result_withdraw);
                 finish();
             }
             else if (resultCode == result_nickchange)
             {
+                // ProfileActivity에서 nickname 변경 시
                 nickname = data.getExtras().getString("nick");
             }
             else if (resultCode == result_pwchange)
             {
+                // ProfileActivity에서 pw 변경 시
                 Toast.makeText(ShowArticleActivity.this, "새 비밀번호로 로그인 해주세요.", Toast.LENGTH_SHORT).show();
                 setResult(result_logout);
                 finish();
+            }
+        }
+        else if(requestCode == request_speach) {
+            if (data != null) {
+                // 음성 검색 결과를 제목 또는 키워드에 포함하는 기사 검색
+                ArrayList<String> result = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                listview_news.setFilterText(result.get(0)) ;
             }
         }
     }
@@ -484,6 +552,20 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
         {
             // gps 사용 꺼져있을 경우
             textView_weather.setText("GPS off");
+        }
+    }
+
+    // google speech api
+    private void promptSpeechInput() {
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "검색어를 말해주세요.");
+        try {
+            startActivityForResult(intent, request_speach);
+        } catch (ActivityNotFoundException a) {
+            Toast.makeText(getApplicationContext(), "검색을 지원하지 않는 언어입니다.", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -574,13 +656,14 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
         getNews(cur_selected_section, selected_year, selected_month, selected_day);
     }
 
+    /*
     // 사용자가 선택한 뉴스 url 열어줌
     private void redirectUsingCustomTab(String url)
     {
         CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
         CustomTabsIntent customTabsIntent = builder.build();
         customTabsIntent.launchUrl(this, Uri.parse("http://" + url));
-    }
+    }*/
 
     // 달력 클릭 시
     public void onClickSearchDate(View v)
@@ -703,347 +786,223 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
     }
 
     // 서버에서 news를 가져와 listview에 넣어주는 함수
-    public void getNews(section selected_section, int selected_year, int selected_month, int selected_day){
+    public void getNews(final section selected_section, final int selected_year, final int selected_month, final int selected_day){
 
         // 서버와 http protocol을 이용하여 사용자가 선택한 분야/날짜의 뉴스를 가져옴
         // 1st parameter : 사용자가 선택한 분야
         // 2nd parameter : 사용자가 선택한 날짜
-        class GetNewsData extends AsyncTask<String, Void, String>{
+        String url = "http://115.71.236.22/get_news.php";
+        StringRequest postRequest = new StringRequest(Request.Method.POST, url,
+                new Response.Listener<String>()
+                {
+                    @Override
+                    public void onResponse(String response) {
+                        try {
+                            // end of listview page
+                            if(response.equals("false"))
+                            {
+                                is_page_end = true;
+                            }
+                            else {
+                                is_page_end = false;
+                                JSONObject jsonObj = new JSONObject(response);
+                                JSONArray news_arr = jsonObj.getJSONArray("result");
 
+                                Log.d("showactivity", Integer.toString(news_arr.length()));
+
+                                // 그 전 날짜의 데이터를 지워줌
+                                if (listview_page == 1)
+                                    news_adapter.init();
+
+                                for (int i = 0; i < news_arr.length(); i++) {
+                                    JSONObject news = news_arr.getJSONObject(i);
+                                    int id = news.getInt("id");
+                                    String keyword = news.getString("keyword");
+                                    String url = news.getString("url");
+                                    String title = news.getString("title");
+                                    String date = news.getString("date");
+                                    String newspaper = news.getString("newspaper");
+                                    int view = news.getInt("view");
+
+
+                                    news_adapter.addItem(id, keyword, url, title, date, newspaper, view, "null");
+                                }
+
+                                news_adapter.notifyDataSetChanged();
+                                if (listview_page == 1)
+                                    listview_news.smoothScrollToPosition( 0 );
+                            }
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                },
+                new Response.ErrorListener()
+                {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                    }
+                }
+        )
+        {
             @Override
-            protected String doInBackground(String... params) {
-
-                String section = (String)params[0];
-                String date = (String) params[1];
+            protected Map<String, String> getParams()
+            {
+                String date = selected_year + "-" + selected_month + "-" + selected_day;
+                String section;
+                switch(selected_section)
+                {
+                    case POLITIC:
+                        section = "politic";
+                        break;
+                    case ECONOMY:
+                        section = "economy";
+                        break;
+                    case SOCIETY:
+                        section = "society";
+                        break;
+                    case SPORT:
+                        section = "sport";
+                        break;
+                    case WORLD:
+                        section = "world";
+                        break;
+                    case CULTURE:
+                        section = "culture";
+                        break;
+                    case SCIENCE:
+                        section = "science";
+                        break;
+                    default:
+                        section = "politic";
+                        break;
+                }
                 String page = Integer.toString(listview_page);
 
-                String serverURL = "http://115.71.236.22/get_news.php";
-                String postParameters = "section=" + section + "&date=" + date +"&page=" + page;
-
-
-                try {
-                    URL url = new URL(serverURL);
-                    HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
-
-                    httpURLConnection.setReadTimeout(5000);
-                    httpURLConnection.setConnectTimeout(5000);
-                    httpURLConnection.setRequestMethod("POST");
-                    //httpURLConnection.setRequestProperty("content-type", "application/json");
-                    httpURLConnection.setDoInput(true);
-                    httpURLConnection.connect();
-
-                    OutputStream outputStream = httpURLConnection.getOutputStream();
-                    outputStream.write(postParameters.getBytes("UTF-8"));
-                    outputStream.flush();
-                    outputStream.close();
-
-                    int responseStatusCode = httpURLConnection.getResponseCode();
-
-                    InputStream inputStream;
-                    if(responseStatusCode == HttpURLConnection.HTTP_OK) {
-                        inputStream = httpURLConnection.getInputStream();
-                    }
-                    else{
-                        inputStream = httpURLConnection.getErrorStream();
-                    }
-
-                    InputStreamReader inputStreamReader = new InputStreamReader(inputStream, "UTF-8");
-                    BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-
-                    StringBuilder sb = new StringBuilder();
-                    String json;
-                    while((json = bufferedReader.readLine())!= null){
-                        sb.append(json+"\n");
-                    }
-
-                    return sb.toString().trim();
-
-                }catch(Exception e){
-                    return null;
-                }
+                Map<String, String>  params = new HashMap<String, String>();
+                params.put("section", section);
+                params.put("date", date);
+                params.put("page", page);
+                return params;
             }
+        };
+        postRequest.setTag(TAG);
 
-            @Override
-            protected void onPostExecute(String result){
-                try {
-                    // end of listview page
-                    if(result.equals("false"))
-                    {
-                        is_page_end = true;
-                    }
-                    else {
-                        is_page_end = false;
-                        JSONObject jsonObj = new JSONObject(result);
-                        JSONArray news_arr = jsonObj.getJSONArray("result");
-
-                        Log.d("showactivity", Integer.toString(news_arr.length()));
-
-                        // 그 전 날짜의 데이터를 지워줌
-                        if (listview_page == 1)
-                            news_adapter.init();
-
-                        for (int i = 0; i < news_arr.length(); i++) {
-                            JSONObject news = news_arr.getJSONObject(i);
-                            int id = news.getInt("id");
-                            String keyword = news.getString("keyword");
-                            String url = news.getString("url");
-                            String title = news.getString("title");
-                            String date = news.getString("date");
-                            String newspaper = news.getString("newspaper");
-                            int view = news.getInt("view");
-
-
-                            news_adapter.addItem(id, keyword, url, title, date, newspaper, view, "null");
-                        }
-
-                        news_adapter.notifyDataSetChanged();
-                        if (listview_page == 1)
-                            listview_news.smoothScrollToPosition( 0 );
-                    }
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-
-        String date = selected_year + "-" + selected_month + "-" + selected_day;
-        String section;
-        switch(selected_section)
-        {
-            case POLITIC:
-                section = "politic";
-                break;
-            case ECONOMY:
-                section = "economy";
-                break;
-            case SOCIETY:
-                section = "society";
-                break;
-            case SPORT:
-                section = "sport";
-                break;
-            case WORLD:
-                section = "world";
-                break;
-            case CULTURE:
-                section = "culture";
-                break;
-            case SCIENCE:
-                section = "science";
-                break;
-            default:
-                section = "politic";
-                break;
-        }
-
-        Log.d("showactivity",date.toString());
-        GetNewsData GetNewsData_Task = new GetNewsData();
-        GetNewsData_Task.execute(section, date);
+        volley_queue.add(postRequest);
     }
 
-    public void addView(section selected_section, String _url, String _gender, String _birthday, String _city){
-
-        // 서버와 http protocol을 이용하여 사용자가 선택한 뉴스의 조회수 증가
-        // 1st parameter : 사용자가 선택한 분야
-        // 2nd parameter : 사용자가 선택한 기사의 url
-        // 3rd parameter : 사용자의 성별
-        // 4th parameter : 사용자의 생일
-        // 5th parameter : 사용자의 도시
-        class AddViewData extends AsyncTask<String, Void, String>{
-
-            @Override
-            protected String doInBackground(String... params) {
-
-                String section = (String)params[0];
-                String _url = (String)params[1];
-                String gender = (String)params[2];
-                String birthday = (String)params[3];
-                String city = (String)params[4];
-
-                String serverURL = "http://115.71.236.22/add_view.php";
-                String postParameters = "section=" + section + "&url=" + _url +"&gender=" + gender + "&birthday=" + birthday + "&city=" + city;
-
-                try {
-                    URL url = new URL(serverURL);
-                    HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
-
-                    httpURLConnection.setReadTimeout(5000);
-                    httpURLConnection.setConnectTimeout(5000);
-                    httpURLConnection.setRequestMethod("POST");
-                    //httpURLConnection.setRequestProperty("content-type", "application/json");
-                    httpURLConnection.setDoInput(true);
-                    httpURLConnection.connect();
-
-                    OutputStream outputStream = httpURLConnection.getOutputStream();
-                    outputStream.write(postParameters.getBytes("UTF-8"));
-                    outputStream.flush();
-                    outputStream.close();
-
-                    int responseStatusCode = httpURLConnection.getResponseCode();
-
-                    InputStream inputStream;
-                    if(responseStatusCode == HttpURLConnection.HTTP_OK) {
-                        inputStream = httpURLConnection.getInputStream();
-                    }
-                    else{
-                        inputStream = httpURLConnection.getErrorStream();
-                    }
-
-                    InputStreamReader inputStreamReader = new InputStreamReader(inputStream, "UTF-8");
-                    BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-
-                    StringBuilder sb = new StringBuilder();
-                    String line = null;
-
-                    while((line = bufferedReader.readLine()) != null){
-                        sb.append(line);
-                    }
-
-                    bufferedReader.close();
-                    return sb.toString();
-
-
-                } catch (Exception e) {
-                    return new String("add view Error: " + e.getMessage());
-                }
-            }
-
-            @Override
-            protected void onPostExecute(String result){
-            }
-        }
-
-        String section;
-        switch(selected_section)
-        {
-            case POLITIC:
-                section = "politic";
-                break;
-            case ECONOMY:
-                section = "economy";
-                break;
-            case SOCIETY:
-                section = "society";
-                break;
-            case SPORT:
-                section = "sport";
-                break;
-            case WORLD:
-                section = "world";
-                break;
-            case CULTURE:
-                section = "culture";
-                break;
-            case SCIENCE:
-                section = "science";
-                break;
-            default:
-                section = "politic";
-                break;
-        }
-
-        AddViewData AddView_Task = new AddViewData();
-        AddView_Task.execute(section, _url, _gender, _birthday, _city);
-    }
-
-    public void addBucket(section selected_section, int user_number, int news_id){
+    public void addBucket(final section selected_section, final int user_number, final int news_id){
 
         // 서버와 http protocol을 이용하여 사용자가 선택한 뉴스를 사용자의 보관함에 넣음
         // 1st parameter : 사용자가 선택한 분야
         // 2nd parameter : 사용자의 number
         // 3rd parameter : 뉴스의 id
-        class AddBucketData extends AsyncTask<String, Void, String>{
-
-            @Override
-            protected String doInBackground(String... params) {
-
-                String section = (String)params[0];
-                String user_number = (String)params[1];
-                String news_id = (String)params[2];
-
-                String serverURL = "http://115.71.236.22/add_bucket.php";
-                String postParameters = "section=" + section + "&user_number=" + user_number +"&news_id=" + news_id + "&action=" + "insert";
-                try {
-                    URL url = new URL(serverURL);
-                    HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
-
-                    httpURLConnection.setReadTimeout(5000);
-                    httpURLConnection.setConnectTimeout(5000);
-                    httpURLConnection.setRequestMethod("POST");
-                    //httpURLConnection.setRequestProperty("content-type", "application/json");
-                    httpURLConnection.setDoInput(true);
-                    httpURLConnection.connect();
-
-                    OutputStream outputStream = httpURLConnection.getOutputStream();
-                    outputStream.write(postParameters.getBytes("UTF-8"));
-                    outputStream.flush();
-                    outputStream.close();
-
-                    int responseStatusCode = httpURLConnection.getResponseCode();
-
-                    InputStream inputStream;
-                    if(responseStatusCode == HttpURLConnection.HTTP_OK) {
-                        inputStream = httpURLConnection.getInputStream();
+        // 4th parameter : 보관함에 담을 시 insert / 보관함에서 삭제 시 delete
+        // response : (success : 담기 성공 / fail : 담기 실패)
+        String url = "http://115.71.236.22/add_bucket.php";
+        StringRequest postRequest = new StringRequest(Request.Method.POST, url,
+                new Response.Listener<String>()
+                {
+                    @Override
+                    public void onResponse(String response) {
+                        if(response.equals("success"))
+                        {
+                            Toast.makeText(ShowArticleActivity.this, "보관함 담기 성공", Toast.LENGTH_SHORT).show();
+                        }
+                        else if(response.equals("fail"))
+                        {
+                            Toast.makeText(ShowArticleActivity.this, "보관함 담기 실패", Toast.LENGTH_SHORT).show();
+                        }
                     }
-                    else{
-                        inputStream = httpURLConnection.getErrorStream();
+                },
+                new Response.ErrorListener()
+                {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        Toast.makeText(ShowArticleActivity.this, "보관함 담기 실패", Toast.LENGTH_SHORT).show();
                     }
-
-                    InputStreamReader inputStreamReader = new InputStreamReader(inputStream, "UTF-8");
-                    BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-
-                    StringBuilder sb = new StringBuilder();
-                    String line = null;
-
-                    while((line = bufferedReader.readLine()) != null){
-                        sb.append(line);
-                    }
-
-                    bufferedReader.close();
-                    return sb.toString();
-
-
-                } catch (Exception e) {
-                    return new String("add bucket Error: " + e.getMessage());
                 }
-            }
-
-            @Override
-            protected void onPostExecute(String result){
-                Toast.makeText(ShowArticleActivity.this, "보관함 담기 성공", Toast.LENGTH_SHORT).show();
-            }
-        }
-
-        String section;
-        switch(selected_section)
+        )
         {
-            case POLITIC:
-                section = "politic";
-                break;
-            case ECONOMY:
-                section = "economy";
-                break;
-            case SOCIETY:
-                section = "society";
-                break;
-            case SPORT:
-                section = "sport";
-                break;
-            case WORLD:
-                section = "world";
-                break;
-            case CULTURE:
-                section = "culture";
-                break;
-            case SCIENCE:
-                section = "science";
-                break;
-            default:
-                section = "politic";
-                break;
-        }
+            @Override
+            protected Map<String, String> getParams()
+            {
+                String section;
+                switch(selected_section)
+                {
+                    case POLITIC:
+                        section = "politic";
+                        break;
+                    case ECONOMY:
+                        section = "economy";
+                        break;
+                    case SOCIETY:
+                        section = "society";
+                        break;
+                    case SPORT:
+                        section = "sport";
+                        break;
+                    case WORLD:
+                        section = "world";
+                        break;
+                    case CULTURE:
+                        section = "culture";
+                        break;
+                    case SCIENCE:
+                        section = "science";
+                        break;
+                    default:
+                        section = "politic";
+                        break;
+                }
 
-        AddBucketData AddBucket_Task = new AddBucketData();
-        AddBucket_Task.execute(section, Integer.toString(user_number), Integer.toString(news_id));
+                Map<String, String>  params = new HashMap<String, String>();
+                params.put("section", section);
+                params.put("user_number", Integer.toString(user_number));
+                params.put("news_id", Integer.toString(news_id));
+                params.put("action", "insert");
+
+                return params;
+            }
+        };
+        postRequest.setTag(TAG);
+
+        volley_queue.add(postRequest);
+    }
+
+    public void save_log(final String action, final String id){
+
+        // 서버와 http protocol을 이용하여 사용자의 접속 기록을 log로 남김
+        // 1st parameter : in (접속 시) or out (종료 시)
+        // 2nd parameter : 사용자의 id
+        String url = "http://115.71.236.22/save_log.php";
+        StringRequest postRequest = new StringRequest(Request.Method.POST, url,
+                new Response.Listener<String>()
+                {
+                    @Override
+                    public void onResponse(String response) {
+                    }
+                },
+                new Response.ErrorListener()
+                {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                    }
+                }
+        )
+        {
+            @Override
+            protected Map<String, String> getParams()
+            {
+                Map<String, String>  params = new HashMap<String, String>();
+                params.put("action", action);
+                params.put("id", id);
+
+                return params;
+            }
+        };
+        postRequest.setTag(TAG);
+
+        volley_queue.add(postRequest);
     }
 }

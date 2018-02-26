@@ -32,6 +32,7 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
 
     static{ System.loadLibrary("opencv_java3"); }
 
+    // 학습된 데이터 클래스
     private static final String[] classNames = {"background",
             "aeroplane", "bicycle", "bird", "boat",
             "bottle", "bus", "car", "cat", "chair",

@@ -66,9 +66,9 @@ public class LoginActivity extends AppCompatActivity {
         pref = getSharedPreferences("lifecast",MODE_PRIVATE);
         editor = pref.edit();
 
-        if(pref.getBoolean("autoLogin",false))  // 자동로그인
+        if(pref.getBoolean("autoLogin",false))  // 로그인 시 자동로그인 체크한 경우
         {
-            String id = pref.getString("id","default"); // default : should never happened
+            String id = pref.getString("id","default");
             String pw = pref.getString("pw","default");
 
             login(id, pw);

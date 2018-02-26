@@ -148,6 +148,7 @@ public class Keyword_dialog extends Dialog {
                             JSONObject jsonObj = new JSONObject(response);
                             JSONArray news_arr = jsonObj.getJSONArray("result");
 
+                            // pieChart data 생성
                             for (int i = 0; i < news_arr.length(); i++) {
                                 JSONObject news = news_arr.getJSONObject(i);
                                 xvalues.add(news.getString("keyword"));
@@ -160,7 +161,6 @@ public class Keyword_dialog extends Dialog {
 
                             // In Percentage term
                             data.setValueFormatter(new PercentFormatter());
-                            // Default value
 
                             pieChart.setData(data);
 

@@ -31,7 +31,7 @@ public class WebViewActivity extends AppCompatActivity {
 
         volley_queue = Volley.newRequestQueue(this);
 
-        // 사용자가 선택한 기사의 url
+        // 사용자 정보
         String section = getIntent().getExtras().getString("section");
         String url = getIntent().getExtras().getString("url");
         int news_id = getIntent().getExtras().getInt("news_id");

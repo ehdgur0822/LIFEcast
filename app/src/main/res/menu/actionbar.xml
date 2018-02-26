@@ -2,11 +2,12 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:lifecast="http://schemas.android.com/apk/res-auto">
 
-    <item android:id="@+id/search"
+    <item
+        android:id="@+id/text_search"
         android:icon="@android:drawable/ic_search_category_default"
-        lifecast:showAsAction="ifRoom|collapseActionView"
+        android:title="text_search"
         lifecast:actionViewClass="android.support.v7.widget.SearchView"
-        android:title="search"/>
+        lifecast:showAsAction="always" />
 
     <item android:id="@+id/profile_btn"
         android:title="프로필"/>
@@ -17,6 +18,17 @@
     <item android:id="@+id/example_btn"
         android:title="카메라"/>
 
+    <item android:id="@+id/camera_btn"
+        android:title="물체인식"/>
+
+    <item android:id="@+id/text_btn"
+        android:title="텍스트"/>
+
     <item android:id="@+id/logout_btn"
         android:title="로그아웃"/>
+    <item
+        android:id="@+id/vocal_search"
+        android:icon="@drawable/ic_speak"
+        android:title="vocal_search"
+        lifecast:showAsAction="always" />
 </menu>

@@ -138,7 +138,6 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
 
                 // Draw rectangle around detected object.
                 //Imgproc.rectangle(subFrame, new Point(xLeftBottom, yLeftBottom), new Point(xRightTop, yRightTop), new Scalar(0, 255, 0));
-
                 DecimalFormat df = new DecimalFormat("#.####");
                 df.setRoundingMode(RoundingMode.CEILING);
                 String rounded_confidence = df.format(confidence);

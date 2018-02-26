@@ -31,6 +31,7 @@ import com.chabbal.slidingdotsplash.OnItemClickListener;
 import com.chabbal.slidingdotsplash.SlidingSplashView;
 import com.lunaticlemon.lifecast.R;
 import com.lunaticlemon.lifecast.camera.CameraActivity;
+import com.lunaticlemon.lifecast.camera.PictureActivity;
 import com.lunaticlemon.lifecast.option_menu.NewsBucketActivity;
 import com.lunaticlemon.lifecast.option_menu.ProfileActivity;
 import com.lunaticlemon.lifecast.paint.PaintActivity;
@@ -468,6 +469,10 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
             case R.id.text_btn:
                 Intent intent_text= new Intent(ShowArticleActivity.this, PaintActivity.class);
                 startActivity(intent_text);
+                return true;
+            case R.id.example_btn:
+                Intent intent_example= new Intent(ShowArticleActivity.this, PictureActivity.class);
+                startActivity(intent_example);
                 return true;
             default:
                 return super.onOptionsItemSelected(item);

@@ -31,6 +31,7 @@ import com.chabbal.slidingdotsplash.OnItemClickListener;
 import com.chabbal.slidingdotsplash.SlidingSplashView;
 import com.lunaticlemon.lifecast.R;
 import com.lunaticlemon.lifecast.camera.CameraActivity;
+import com.lunaticlemon.lifecast.minigame.MiniGameActivity;
 import com.lunaticlemon.lifecast.camera.PictureActivity;
 import com.lunaticlemon.lifecast.option_menu.NewsBucketActivity;
 import com.lunaticlemon.lifecast.option_menu.ProfileActivity;
@@ -65,7 +66,7 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
 
     public static int request_showarticle = 3001, request_speach = 3002;
     public static int result_nickchange = 4001, result_pwchange = 4002;
-    public enum section {POLITIC, ECONOMY, SOCIETY, SPORT, WORLD, CULTURE, SCIENCE};
+    public enum section {POLITIC, ECONOMY, SOCIETY, SPORT, WORLD, CULTURE, SCIENCE}
 
     String TAG = "ShowArticle";
 
@@ -462,17 +463,21 @@ public class ShowArticleActivity extends AppCompatActivity implements YahooWeath
                 setResult(result_logout);
                 finish();
                 return true;
-            case R.id.camera_btn:
-                Intent intent_camera= new Intent(ShowArticleActivity.this, CameraActivity.class);
-                startActivity(intent_camera);
+            case R.id.recognize_btn:
+                Intent intent_recognize= new Intent(ShowArticleActivity.this, CameraActivity.class);
+                startActivity(intent_recognize);
                 return true;
             case R.id.text_btn:
                 Intent intent_text= new Intent(ShowArticleActivity.this, PaintActivity.class);
                 startActivity(intent_text);
                 return true;
-            case R.id.example_btn:
-                Intent intent_example= new Intent(ShowArticleActivity.this, PictureActivity.class);
-                startActivity(intent_example);
+            case R.id.camera_btn:
+                Intent intent_camera= new Intent(ShowArticleActivity.this, PictureActivity.class);
+                startActivity(intent_camera);
+                return true;
+            case R.id.minigame_btn:
+                Intent intent_minigame= new Intent(ShowArticleActivity.this, MiniGameActivity.class);
+                startActivity(intent_minigame);
                 return true;
             default:
                 return super.onOptionsItemSelected(item);

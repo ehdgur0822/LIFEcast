@@ -112,6 +112,7 @@ public class Statistic_dialog extends Dialog {
         ArrayAdapter<String> adapter_age = new ArrayAdapter<String>(con, android.R.layout.simple_spinner_dropdown_item, arr_age);
         ArrayAdapter<String> adapter_city = new ArrayAdapter<String>(con, android.R.layout.simple_spinner_dropdown_item, arr_city);
 
+        // spinner의 default는 사용자의 데이터로 맞춤
         spinner_gender.setAdapter(adapter_gender);
         switch(user_gender)
         {

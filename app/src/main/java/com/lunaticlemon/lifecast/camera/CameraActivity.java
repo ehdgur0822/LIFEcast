@@ -95,7 +95,6 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
         final double MEAN_VAL = 127.5;
         final double THRESHOLD = 0.2;
 
-        // Get a new frame
         Mat frame = inputFrame.rgba();
         Imgproc.cvtColor(frame, frame, Imgproc.COLOR_RGBA2RGB);
 
@@ -127,6 +126,7 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
 
         detections = detections.reshape(1, (int)detections.total() / 7);
 
+        // 검출된 물체에 대해 틀을 그림
         for (int i = 0; i < detections.rows(); ++i) {
             double confidence = detections.get(i, 2)[0];
             if (confidence > THRESHOLD) {
@@ -137,7 +137,6 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
                 int xRightTop   = (int)(detections.get(i, 5)[0] * cols);
                 int yRightTop   = (int)(detections.get(i, 6)[0] * rows);
 
-                // Draw rectangle around detected object.
                 //Imgproc.rectangle(subFrame, new Point(xLeftBottom, yLeftBottom), new Point(xRightTop, yRightTop), new Scalar(0, 255, 0));
                 DecimalFormat df = new DecimalFormat("#.####");
                 df.setRoundingMode(RoundingMode.CEILING);

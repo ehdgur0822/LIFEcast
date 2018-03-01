@@ -15,10 +15,13 @@
     <item android:id="@+id/bucket_btn"
         android:title="보관함"/>
 
-    <item android:id="@+id/example_btn"
+    <item android:id="@+id/camera_btn"
         android:title="카메라"/>
 
-    <item android:id="@+id/camera_btn"
+    <item android:id="@+id/minigame_btn"
+        android:title="미니게임"/>
+
+    <item android:id="@+id/recognize_btn"
         android:title="물체인식"/>
 
     <item android:id="@+id/text_btn"

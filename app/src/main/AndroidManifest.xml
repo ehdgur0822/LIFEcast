@@ -71,12 +71,12 @@
             android:name=".paint.PenDialog"
             android:theme="@android:style/Theme.Dialog" />
         <activity
-            android:name=".example.ExampleActivity"
+            android:name=".camera.PictureActivity"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
-        <activity android:name=".camera.PictureActivity"
+        <activity android:name=".minigame.MiniGameActivity"
             android:screenOrientation="landscape"
-            android:theme="@style/Theme.AppCompat.NoActionBar" ></activity>
+            android:theme="@style/Theme.AppCompat.NoActionBar"/>
     </application>
 
 </manifest>

@@ -148,6 +148,7 @@ public class PictureActivity extends AppCompatActivity implements View.OnTouchLi
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
         mOpenCvCameraView = (CustomSurfaceView) findViewById(R.id.surface_view);
         mOpenCvCameraView.setCvCameraViewListener(this);
         mOpenCvCameraView.setCameraIndex(viewOri); // front-camera(1),  back-camera(0)

@@ -32,7 +32,7 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
 
     static{ System.loadLibrary("opencv_java3"); }
 
-    // 학습된 데이터 클래스
+    // 학습된 데이터들의 종류 클래스
     private static final String[] classNames = {"background",
             "aeroplane", "bicycle", "bird", "boat",
             "bottle", "bus", "car", "cat", "chair",
@@ -93,12 +93,12 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
         final float WH_RATIO = (float)IN_WIDTH / IN_HEIGHT;
         final double IN_SCALE_FACTOR = 0.007843;
         final double MEAN_VAL = 127.5;
-        final double THRESHOLD = 0.2;
+        final double THRESHOLD = 0.5;
 
         Mat frame = inputFrame.rgba();
         Imgproc.cvtColor(frame, frame, Imgproc.COLOR_RGBA2RGB);
 
-        // Forward image through network.
+        // 이미지 검출
         Mat blob = Dnn.blobFromImage(frame, IN_SCALE_FACTOR,
                 new Size(IN_WIDTH, IN_HEIGHT),
                 new Scalar(MEAN_VAL, MEAN_VAL, MEAN_VAL), true, false);

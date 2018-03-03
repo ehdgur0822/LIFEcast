@@ -1,14 +1,15 @@
 package com.lunaticlemon.lifecast.minigame;
 
-import android.content.DialogInterface;
 import android.hardware.Camera;
 import android.os.Bundle;
-import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.ImageButton;
 
 import com.lunaticlemon.lifecast.R;
 import com.lunaticlemon.lifecast.camera.ColorBlobDetector;
@@ -38,35 +39,30 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Random;
 
-
-public class MiniGameActivity extends AppCompatActivity implements View.OnTouchListener, CameraBridgeViewBase.CvCameraViewListener2 {
+public class PuzzleGameActivity extends AppCompatActivity implements View.OnTouchListener, CameraBridgeViewBase.CvCameraViewListener2 {
 
     static{ System.loadLibrary("opencv_java3"); }
 
-    String TAG = "MiniGame";
+    String TAG = "Puzzle";
 
     private Mat mRgba;
     private Mat mGray;
     private Mat mIntermediateMat;
-    private Mat rgbaInnerWindow;
+    private Mat puzzle_board;
+
+    // 사용자의 물체 끝부분 위치를 나타낼 효과
+    private Mat effect;
 
     private CustomSurfaceView mOpenCvCameraView;
-
-    // 게임 오버 시 true
-    private boolean is_gameover = false;
 
     // 카메라 방향
     public static final int VIEW_ORI_FRONT = 0;
     public static final int VIEW_ORI_BACK = 1;
-    public int viewOri = VIEW_ORI_BACK;
+    public int viewOri = VIEW_ORI_FRONT;
+    public int viewOrinum = 2;
 
-    // 비행사 , 총알, 난이도
-    private Mat astronaut, bullet;
-    private Size astronaut_size = new Size(100, 100);
-    private Size bullet_size = new Size(100, 100);
-    private int hardness = 2;
+    private ImageButton imageButton_takePicture;
 
     double iThreshold = 0;
 
@@ -85,12 +81,17 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
 
     int numberOfFingers = 0;
 
-    // 화면에 나타날 bullet list
-    private List<Bullet> bullet_list;
-    // 화면 밖으로 나가 삭제될 bullet
-    private List<Bullet> bullet_to_delete;
-    // 화면 밖으로 나간 bullet 개수
-    private int deleted_bullet;
+    private PuzzleProcessor mPuzzleProcessor;
+    private MenuItem mItemHideNumbers;
+    private MenuItem mItemStartNewGame;
+
+    private int mGameWidth, mGameHeight;
+    private Point far_point;
+
+    // 효과 경로 저장 list
+    private List<Point> effect_trace;
+    // 해당 point에 클릭 이벤트를 발생시킬 effect 개수
+    private int effect_threshold = 20;
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -100,12 +101,11 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
                 {
                     Log.i(TAG, "OpenCV loaded successfully");
                     mOpenCvCameraView.enableView();
-                    mOpenCvCameraView.setOnTouchListener(MiniGameActivity.this);
+                    mOpenCvCameraView.setOnTouchListener(PuzzleGameActivity.this);
 
-                    // 이미지 불러옴
+                    // 효과 이미지 불러옴
                     try {
-                        astronaut = Utils.loadResource(MiniGameActivity.this, R.drawable.astronaut, -1);
-                        bullet = Utils.loadResource(MiniGameActivity.this, R.drawable.bullet, -1);
+                        effect = Utils.loadResource(PuzzleGameActivity.this, R.drawable.effect1, -1);
                     }catch (IOException e) {
                     }
                 } break;
@@ -120,14 +120,38 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_mini_game);
-
+        setContentView(R.layout.activity_puzzle_game);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
         mOpenCvCameraView = (CustomSurfaceView) findViewById(R.id.surface_view);
         mOpenCvCameraView.setCvCameraViewListener(this);
         mOpenCvCameraView.setCameraIndex(viewOri); // front-camera(1),  back-camera(0)
 
+        effect_trace = new LinkedList<>();
+
+        mPuzzleProcessor = new PuzzleProcessor();
+        mPuzzleProcessor.prepareNewGame();
+
+        imageButton_takePicture = (ImageButton) findViewById(R.id.imageButton_takePicture);
+
+        imageButton_takePicture.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+                // 현재 frame 저장
+                mRgba.copyTo(puzzle_board);
+
+                // 카메라 방향 변경
+                viewOri++;
+                viewOri %= viewOrinum;
+
+                mOpenCvCameraView.disableView();
+                mOpenCvCameraView.setCameraIndex(viewOri); // front-camera(1),  back-camera(0)
+                mOpenCvCameraView.enableView();
+
+                imageButton_takePicture.setVisibility(View.INVISIBLE);
+            }
+        });
     }
 
     @Override
@@ -146,15 +170,36 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_1_0, this, mLoaderCallback);
     }
 
+    @Override
     public void onDestroy() {
         super.onDestroy();
         mOpenCvCameraView.disableView();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        mItemHideNumbers = menu.add("Show/hide tile numbers");
+        mItemStartNewGame = menu.add("Start new game");
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item == mItemStartNewGame) {
+            /* We need to start new game */
+            mPuzzleProcessor.prepareNewGame();
+        } else if (item == mItemHideNumbers) {
+            /* We need to enable or disable drawing of the tile numbers */
+            mPuzzleProcessor.toggleTileNumbers();
+        }
+        return true;
     }
 
     public void onCameraViewStarted(int width, int height) {
         mGray = new Mat();
         mRgba = new Mat();
         mIntermediateMat = new Mat();
+        puzzle_board = new Mat();
 
         // custum view 초기화
         Camera.Size resolution = mOpenCvCameraView.getResolution();
@@ -163,6 +208,8 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         mOpenCvCameraView.setParameters(cParams);
 
         mRgba = new Mat(height, width, CvType.CV_8UC4);
+        puzzle_board = new Mat(height, width, CvType.CV_8UC4);
+        mIntermediateMat = new Mat(height, width, CvType.CV_8UC4);
         mDetector = new ColorBlobDetector();
         mSpectrum = new Mat();
         mBlobColorRgba = new Scalar(255);
@@ -171,65 +218,64 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         CONTOUR_COLOR = new Scalar(255,0,0,255);
         CONTOUR_COLOR_WHITE = new Scalar(255,255,255,255);
 
+        mGameWidth = width;
+        mGameHeight = height;
+        mPuzzleProcessor.prepareGameSize(width, height);
 
-        bullet_list = new LinkedList<>();
-        bullet_to_delete = new LinkedList<>();
-
-        deleted_bullet = 0;
-
-        // 초기 bullet list 생성
-        init_bullet(width, height, 10);
+        far_point = new Point();
     }
 
     public void onCameraViewStopped() {
         mGray.release();
         mRgba.release();
+        puzzle_board.release();
         mIntermediateMat.release();
     }
 
     public boolean onTouch(View v, MotionEvent event) {
-        int cols = mRgba.cols();
-        int rows = mRgba.rows();
+        if(!mIsColorSelected) {
+            int cols = mRgba.cols();
+            int rows = mRgba.rows();
 
-        int xOffset = (mOpenCvCameraView.getWidth() - cols) / 2;
-        int yOffset = (mOpenCvCameraView.getHeight() - rows) / 2;
+            int xOffset = (mOpenCvCameraView.getWidth() - cols) / 2;
+            int yOffset = (mOpenCvCameraView.getHeight() - rows) / 2;
 
-        int x = (int)event.getX() - xOffset;
-        int y = (int)event.getY() - yOffset;
+            int x = (int) event.getX() - xOffset;
+            int y = (int) event.getY() - yOffset;
 
-        // 범위 체크
-        if ((x < 0) || (y < 0) || (x > cols) || (y > rows)) return false;
+            // 범위 체크
+            if ((x < 0) || (y < 0) || (x > cols) || (y > rows)) return false;
 
-        // 사용자가 터치한 부분 영역
-        Rect touchedRect = new Rect();
+            // 사용자가 터치한 부분 영역
+            Rect touchedRect = new Rect();
 
-        touchedRect.x = (x>5) ? x-5 : 0;
-        touchedRect.y = (y>5) ? y-5 : 0;
+            touchedRect.x = (x > 5) ? x - 5 : 0;
+            touchedRect.y = (y > 5) ? y - 5 : 0;
 
-        touchedRect.width = (x+5 < cols) ? x + 5 - touchedRect.x : cols - touchedRect.x;
-        touchedRect.height = (y+5 < rows) ? y + 5 - touchedRect.y : rows - touchedRect.y;
+            touchedRect.width = (x + 5 < cols) ? x + 5 - touchedRect.x : cols - touchedRect.x;
+            touchedRect.height = (y + 5 < rows) ? y + 5 - touchedRect.y : rows - touchedRect.y;
 
-        Mat touchedRegionRgba = mRgba.submat(touchedRect);
+            Mat touchedRegionRgba = mRgba.submat(touchedRect);
 
-        Mat touchedRegionHsv = new Mat();
-        Imgproc.cvtColor(touchedRegionRgba, touchedRegionHsv, Imgproc.COLOR_RGB2HSV_FULL);
+            Mat touchedRegionHsv = new Mat();
+            Imgproc.cvtColor(touchedRegionRgba, touchedRegionHsv, Imgproc.COLOR_RGB2HSV_FULL);
 
-        // 터치한 영역의 색 구함
-        mBlobColorHsv = Core.sumElems(touchedRegionHsv);
-        int pointCount = touchedRect.width*touchedRect.height;
-        for (int i = 0; i < mBlobColorHsv.val.length; i++)
-            mBlobColorHsv.val[i] /= pointCount;
+            // 터치한 영역의 색 구함
+            mBlobColorHsv = Core.sumElems(touchedRegionHsv);
+            int pointCount = touchedRect.width * touchedRect.height;
+            for (int i = 0; i < mBlobColorHsv.val.length; i++)
+                mBlobColorHsv.val[i] /= pointCount;
 
-        mBlobColorRgba = converScalarHsv2Rgba(mBlobColorHsv);
-        mDetector.setHsvColor(mBlobColorHsv);
+            mBlobColorRgba = converScalarHsv2Rgba(mBlobColorHsv);
+            mDetector.setHsvColor(mBlobColorHsv);
 
-        Imgproc.resize(mDetector.getSpectrum(), mSpectrum, SPECTRUM_SIZE);
+            Imgproc.resize(mDetector.getSpectrum(), mSpectrum, SPECTRUM_SIZE);
 
-        mIsColorSelected = true;
+            mIsColorSelected = true;
 
-        touchedRegionRgba.release();
-        touchedRegionHsv.release();
-
+            touchedRegionRgba.release();
+            touchedRegionHsv.release();
+        }
         return false; // don't need subsequent touch events
     }
 
@@ -245,11 +291,15 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         mRgba = inputFrame.rgba();
         mGray = inputFrame.gray();
 
-        // 뒤 카메라 이용시 180도 회전
-        if(viewOri == VIEW_ORI_BACK)
+        if(viewOri == VIEW_ORI_FRONT)
         {
-            Core.flip(mRgba ,mRgba ,1);
-            Core.flip(mGray ,mGray ,1);
+            return mRgba;
+        }
+
+        // 뒤 카메라 이용시 180도 회전
+        if (viewOri == VIEW_ORI_BACK) {
+            Core.flip(mRgba, mRgba, 1);
+            Core.flip(mGray, mGray, 1);
         }
 
         iThreshold = 8000;
@@ -258,24 +308,21 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         Imgproc.GaussianBlur(mRgba, mRgba, new org.opencv.core.Size(3, 3), 1, 1);
         //Imgproc.medianBlur(mRgba, mRgba, 3);
 
-        // 사용자가 물체를 터치 안했을 시
+        // 사용자가 물체를 터치 안했을 시 back 카메라 보여줌
         if (!mIsColorSelected)
-            return mRgba;
-
-        // 게임 오버 시, 사용자가 다이얼로그 확인 버튼 클릭 전
-        if(is_gameover)
             return mRgba;
 
         // 사용자가 터치한 물체 경계선 list
         List<MatOfPoint> contours = mDetector.getContours();
         mDetector.process(mRgba);
 
+        // 사용자가 터치한 물체가 검출되지 않을 때 퍼즐화면만 보여줌
         if (contours.size() <= 0) {
-            return mRgba;
+            return mPuzzleProcessor.puzzleFrame(puzzle_board);
         }
 
         // 사용자가 터치한 물체를 감싸는 사각형 구함
-        RotatedRect rect = Imgproc.minAreaRect(new MatOfPoint2f(contours.get(0)	.toArray()));
+        RotatedRect rect = Imgproc.minAreaRect(new MatOfPoint2f(contours.get(0).toArray()));
 
         double boundWidth = rect.size.width;
         double boundHeight = rect.size.height;
@@ -307,13 +354,13 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         MatOfInt4 convexDefect = new MatOfInt4();
         Imgproc.convexHull(new MatOfPoint(contours.get(boundPos).toArray()), hull);
 
-        if(hull.toArray().length < 3)
-            return mRgba;
+        if (hull.toArray().length < 3)
+            return mPuzzleProcessor.puzzleFrame(puzzle_board);
 
         Imgproc.convexityDefects(new MatOfPoint(contours.get(boundPos).toArray()), hull, convexDefect);
 
-        if(convexDefect.empty())
-            return mRgba;
+        if (convexDefect.empty())
+            return mPuzzleProcessor.puzzleFrame(puzzle_board);
 
         List<MatOfPoint> hullPoints = new LinkedList<MatOfPoint>();
         List<Point> listPo = new LinkedList<Point>();
@@ -327,11 +374,11 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
 
         List<MatOfPoint> defectPoints = new LinkedList<MatOfPoint>();
         List<Point> listPoDefect = new LinkedList<Point>();
-        for (int j = 0; j < convexDefect.toList().size(); j = j+4) {
-            Point farPoint = contours.get(boundPos).toList().get(convexDefect.toList().get(j+2));
-            Integer depth = convexDefect.toList().get(j+3);
-            if(depth > iThreshold && farPoint.y < boundRect_threshold){
-                listPoDefect.add(contours.get(boundPos).toList().get(convexDefect.toList().get(j+2)));
+        for (int j = 0; j < convexDefect.toList().size(); j = j + 4) {
+            Point farPoint = contours.get(boundPos).toList().get(convexDefect.toList().get(j + 2));
+            Integer depth = convexDefect.toList().get(j + 3);
+            if (depth > iThreshold && farPoint.y < boundRect_threshold) {
+                listPoDefect.add(contours.get(boundPos).toList().get(convexDefect.toList().get(j + 2)));
             }
         }
 
@@ -344,7 +391,7 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         int defectsTotal = (int) convexDefect.total();
 
         this.numberOfFingers = listPoDefect.size();
-        if(this.numberOfFingers > 5) this.numberOfFingers = 5;
+        if (this.numberOfFingers > 5) this.numberOfFingers = 5;
 
         // 사용자가 선택한 물체의 가운데 찾기
         MatOfPoint mop = new MatOfPoint();
@@ -360,67 +407,25 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         //Imgproc.circle(mRgba, centroid, 6, new Scalar(255,255,255));
 
         double far = 0.0;
-        Point far_point = new Point();
         boolean checked = false;
 
-        // 사용자가 선택한 물체의 끝 점 계산
-        for(Point p : listPo){
+        // 사용작가 선택한 물체의 끝 점 계산
+        for (Point p : listPo) {
             //Imgproc.circle(mRgba, p, 6, new Scalar(255,255,0));
-            if(euclideanDistance(centroid, p) > far)
-            {
+            if (euclideanDistance(centroid, p) > far) {
                 far_point = p;
                 checked = true;
             }
         }
 
-        if(checked) {
-            mIntermediateMat = mRgba;
-            mRgba = putMask(mIntermediateMat, astronaut, far_point, astronaut_size);
-
-            for(Bullet b : bullet_list)
-            {
-                // bullet이 화면 안에서 움직임
-                if(b.move()) {
-                    if(b.check_collision(far_point, astronaut_size))    // 충돌 발생
-                    {
-                        // 게임종료 필요
-                        // TODO
-                        Log.d(TAG, "astronaut" + far_point + "/" + astronaut_size.width + "/" + astronaut_size.height + " , " + "bullet" + b.bullet_location());
-                        game_over();
-                    }
-                    else {
-                        mIntermediateMat = mRgba;
-                        mRgba = putMask(mIntermediateMat, bullet, b.bullet_location(), bullet_size);
-                    }
-                }
-                else
-                {
-                    // bullet이 화면 밖으로 움직임 -> bullet 삭제필요
-                    bullet_to_delete.add(b);
-                }
-            }
-
-            // 새로운 bullet 생성 , 화면 밖으로 움직인 bullet * 난이도만큼 생성
-            //make_bullet(mRgba.width(), mRgba.height(), delete_bullet.size() * hardness);
-
-            deleted_bullet += bullet_to_delete.size();
-
-            // 화면 밖으로 움직인 bullet 삭제
-            for(Bullet b : bullet_to_delete)
-            {
-                bullet_list.remove(b);
-            }
-
-            // bullet이 화면 밖으로 움직인 경우 새 bullet 생성 후 list 비움
-            if(bullet_to_delete.size() > 0) {
-                make_bullet(mRgba.width(), mRgba.height(), bullet_to_delete.size());
-                bullet_to_delete.clear();
-            }
-
-
+        if (checked) {
+            mIntermediateMat = mPuzzleProcessor.puzzleFrame(puzzle_board).clone();
+            mIntermediateMat = putMask(mIntermediateMat, far_point, new Size(100, 100));
+            check_click(far_point);
+            return mIntermediateMat;
         }
 
-        return mRgba;
+        return mPuzzleProcessor.puzzleFrame(puzzle_board);
     }
 
     // 두 점 사이의 거리
@@ -436,8 +441,7 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         return distance;
     }
 
-    // src의 center에 mask를 씌움
-    public Mat putMask(Mat src, Mat mask, Point center, Size mask_size){
+    public Mat putMask(Mat src, Point center, Size mask_size){
 
         // 그려질 영역 범위가 화면 밖일 때
         if((int)(center.x - mask_size.width/2) < 0 || (int)(center.y - mask_size.height/2) < 0 ||
@@ -448,7 +452,7 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         Mat src_roi = new Mat();
         Mat roi_gray = new Mat();
 
-        Imgproc.resize(mask, mask_resized, mask_size);
+        Imgproc.resize(effect, mask_resized, mask_size);
 
         // 효과가 그려질 부분
         Rect roi = new Rect((int)(center.x - mask_size.width/2), (int)(center.y - mask_size.height/2),
@@ -497,94 +501,65 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         return src;
     }
 
-    // 초기 bullet을 number*3 개수만큼 만듬
-    public void init_bullet(int width, int height, int number)
+    public void check_click(Point effect_point)
     {
-        Random rand = new Random();
-        int temp;
+        effect_trace.add(effect_point);
 
-        for(int i=0;i<number;i++)
+        if(effect_trace.size() > effect_threshold)
         {
-            // 오른쪽에서 생성
-            // 랜덤한 높이 설정
-            temp = rand.nextInt(height);
-            bullet_list.add(new Bullet(width, temp, 0, width, 0, height, bullet_size));
+            boolean is_clicked = true;
+            int last_box = calculate_box(effect_trace.get(effect_trace.size()-1));
 
-            // 위에서 생성
-            // 랜덤한 너비 생성
-            temp = rand.nextInt(width/2) + width/2;
-            bullet_list.add(new Bullet(temp, height , 0, width, 0, height, bullet_size));
-
-            // 아래서 생성
-            // 랜덤한 높이 설정
-            temp = rand.nextInt(width/2) + width/2;
-            bullet_list.add(new Bullet(temp, 0, 0, width, 0, height, bullet_size));
-        }
-    }
-
-    // bullet을 추가적으로 생성
-    public void make_bullet(int width, int height, int number)
-    {
-        Log.d(TAG, "make bullet" + number);
-
-        Random rand = new Random();
-        int multiple = rand.nextInt(3) + 1;
-        int temp;
-
-        for(int i=0;i<number * multiple;i++)
-        {
-            switch(rand.nextInt(3))
+            for(int i = effect_trace.size()-2;i > effect_trace.size()-effect_threshold-1;i--)
             {
-                case 0:
-                    // 오른쪽에서 생성
-                    // 랜덤한 높이 설정
-                    temp = rand.nextInt(height);
-                    bullet_list.add(new Bullet(width, temp, 0, width, 0, height, bullet_size));
+                if(calculate_box(effect_trace.get(i)) != last_box)
+                {
+                    is_clicked = false;
                     break;
-                case 1:
-                    // 위에서 생성
-                    // 랜덤한 너비 생성
-                    temp = rand.nextInt(width/2) + width/2;
-                    bullet_list.add(new Bullet(temp, height , 0, width, 0, height, bullet_size));
-                    break;
-                case 2:
-                    // 아래서 생성
-                    // 랜덤한 높이 설정
-                    temp = rand.nextInt(width/2) + width/2;
-                    bullet_list.add(new Bullet(temp, 0, 0, width, 0, height, bullet_size));
-                    break;
+                }
             }
+
+            // click인 경우 click이벤트 처리
+            if(is_clicked) {
+                mPuzzleProcessor.deliverTouchEvent((int) effect_trace.get(effect_trace.size() - 1).x, (int) effect_trace.get(effect_trace.size() - 1).y);
+                effect_trace.clear();
+            }
+
+
         }
     }
 
-    // astronaut이 bullet에 닿았을때 실행
-    public void game_over()
+    // effect가 현재 위치한 퍼즐 번호를 알아냄
+    // 실제 섞인 퍼즐의 번호가 아닌 절대적인 번호를 알아냄
+    // example)
+    //  1 . 2 . 3 . 4
+    //  5 . 6 . 7 . 8
+    //  9 .10 .11 .12
+    // 13 .14 .15 .16
+    public int calculate_box(Point effect)
     {
-        is_gameover = true;
+        int puzzle_width = mGameWidth / mPuzzleProcessor.getGridSize();
+        int puzzle_height = mGameHeight / mPuzzleProcessor.getGridSize();
 
-        new Thread() {
-            public void run() {
-                MiniGameActivity.this.runOnUiThread(new Runnable(){
-                    @Override
-                    public void run(){
-                        try {
-                            AlertDialog.Builder builder = new AlertDialog.Builder(MiniGameActivity.this);
-                            builder.setMessage("Game Over! " + String.valueOf(deleted_bullet * 10) + "점 달성.");
-                            builder.setPositiveButton("게임 종료",new DialogInterface.OnClickListener(){
-                                public void onClick(DialogInterface dialog, int whichButton)
-                                {
-                                    finish();
-                                }
-                            });
-                            AlertDialog game_over_dialog = builder.create();
-                            game_over_dialog.show();
-                        }
-                        catch (Exception e) {}
-                    }
-                });
+        int box_width;
+        int box_height;
+
+        for(int i = 1;;i++)
+        {
+            if(puzzle_width * i > effect.x) {
+                box_width = i;
+                break;
             }
-        }.start();
+        }
 
+        for(int i = 1;;i++)
+        {
+            if(puzzle_height * i > effect.y) {
+                box_height = i;
+                break;
+            }
+        }
+
+        return box_width + box_height * mPuzzleProcessor.getGridSize();
     }
 }
-

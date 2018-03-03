@@ -29,8 +29,8 @@ public class Bullet {
         this.size = new Size(size.width, size.height);
 
         // bullet 이동속도 : 1~3 사이의 랜덤한 값을 가짐
-        this.x_velocity = new Random().nextInt(10) + 1;
-        this.y_velocity = new Random().nextInt(10) + 1;
+        this.x_velocity = new Random().nextInt(15) + 1;
+        this.y_velocity = new Random().nextInt(15) + 1;
         if(this.location.y != 0)
             this.y_velocity *= -1;
 
@@ -44,8 +44,11 @@ public class Bullet {
 
     // 움직일 수 있는 경우 이동하고 return true, 움직일 수 없으면 return false
     public boolean move(){
-        location.x -= x_velocity;
-        location.y += y_velocity;
+        // 랜덤한 움직임을 부여
+        if(new Random().nextBoolean())
+            location.x -= x_velocity;
+        if(new Random().nextBoolean())
+            location.y += y_velocity;
 
         return !(location.x > max_x || location.x < min_x || location.y > max_y || location.y < min_y);
     }

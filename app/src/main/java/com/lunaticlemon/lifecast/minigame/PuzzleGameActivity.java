@@ -427,7 +427,7 @@ public class PuzzleGameActivity extends AppCompatActivity implements View.OnTouc
         return mPuzzleProcessor.puzzleFrame(puzzle_board);
     }
 
-    // 두 점 사이의 거리
+    // 두 점 a,b 사이의 거리
     public double euclideanDistance(Point a, Point b){
         double distance = 0.0;
 
@@ -440,6 +440,7 @@ public class PuzzleGameActivity extends AppCompatActivity implements View.OnTouc
         return distance;
     }
 
+    // src의 center에 mask를 씌움
     public Mat putMask(Mat src, Point center, Size mask_size){
 
         // 그려질 영역 범위가 화면 밖일 때
@@ -509,6 +510,7 @@ public class PuzzleGameActivity extends AppCompatActivity implements View.OnTouc
             boolean is_clicked = true;
             int last_box = calculate_box(effect_trace.get(effect_trace.size()-1));
 
+            // effect가 계속 같은 위치에 있는지 확인
             for(int i = effect_trace.size()-2;i > effect_trace.size()-effect_threshold-1;i--)
             {
                 if(calculate_box(effect_trace.get(i)) != last_box)
@@ -529,7 +531,7 @@ public class PuzzleGameActivity extends AppCompatActivity implements View.OnTouc
     }
 
     // effect가 현재 위치한 퍼즐 번호를 알아냄
-    // 실제 섞인 퍼즐의 번호가 아닌 절대적인 번호를 알아냄
+    // 실제 섞인 퍼즐의 번호가 아닌 절대적인 위치에 대한 번호
     // example)
     //  1 . 2 . 3 . 4
     //  5 . 6 . 7 . 8

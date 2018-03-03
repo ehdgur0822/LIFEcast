@@ -49,6 +49,7 @@ public class PuzzleGameActivity extends AppCompatActivity implements View.OnTouc
     private Mat mRgba;
     private Mat mGray;
     private Mat mIntermediateMat;
+    // puzzle 배경 화면
     private Mat puzzle_board;
 
     // 사용자의 물체 끝부분 위치를 나타낼 효과
@@ -138,9 +139,6 @@ public class PuzzleGameActivity extends AppCompatActivity implements View.OnTouc
 
             @Override
             public void onClick(View v) {
-                // 현재 frame 저장
-                mRgba.copyTo(puzzle_board);
-
                 // 카메라 방향 변경
                 viewOri++;
                 viewOri %= viewOrinum;
@@ -293,7 +291,8 @@ public class PuzzleGameActivity extends AppCompatActivity implements View.OnTouc
 
         if(viewOri == VIEW_ORI_FRONT)
         {
-            return mRgba;
+            puzzle_board = inputFrame.rgba();
+            return puzzle_board;
         }
 
         // 뒤 카메라 이용시 180도 회전
@@ -419,7 +418,7 @@ public class PuzzleGameActivity extends AppCompatActivity implements View.OnTouc
         }
 
         if (checked) {
-            mIntermediateMat = mPuzzleProcessor.puzzleFrame(puzzle_board).clone();
+            mPuzzleProcessor.puzzleFrame(puzzle_board).copyTo(mIntermediateMat);
             mIntermediateMat = putMask(mIntermediateMat, far_point, new Size(100, 100));
             check_click(far_point);
             return mIntermediateMat;

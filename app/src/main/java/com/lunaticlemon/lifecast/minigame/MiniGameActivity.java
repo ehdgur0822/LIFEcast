@@ -62,10 +62,12 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
     public static final int VIEW_ORI_BACK = 1;
     public int viewOri = VIEW_ORI_BACK;
 
-    // 비행사 , 총알, 난이도
+    // 비행사, 총알
     private Mat astronaut, bullet;
     private Size astronaut_size = new Size(100, 100);
     private Size bullet_size = new Size(100, 100);
+
+    // 난이도, 추가적인 총알 생성 시 사용
     private int hardness = 4;
 
     double iThreshold = 0;
@@ -89,7 +91,7 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
     private List<Bullet> bullet_list;
     // 화면 밖으로 나가 삭제될 bullet
     private List<Bullet> bullet_to_delete;
-    // 화면 밖으로 나간 bullet 개수
+    // 화면 밖으로 나간 bullet 개수 -> 점수계산에 사용
     private int deleted_bullet;
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
@@ -172,6 +174,7 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         CONTOUR_COLOR_WHITE = new Scalar(255,255,255,255);
 
 
+        // 총알 관련 변수 초기화
         bullet_list = new LinkedList<>();
         bullet_to_delete = new LinkedList<>();
 
@@ -343,6 +346,7 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
 
         int defectsTotal = (int) convexDefect.total();
 
+        // 손가락 개수 계산
         this.numberOfFingers = listPoDefect.size();
         if(this.numberOfFingers > 5) this.numberOfFingers = 5;
 
@@ -383,8 +387,7 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
                 if(b.move()) {
                     if(b.check_collision(far_point, astronaut_size))    // 충돌 발생
                     {
-                        // 게임종료 필요
-                        // TODO
+                        // 게임종료
                         Log.d(TAG, "astronaut" + far_point + "/" + astronaut_size.width + "/" + astronaut_size.height + " , " + "bullet" + b.bullet_location());
                         game_over();
                     }
@@ -399,9 +402,6 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
                     bullet_to_delete.add(b);
                 }
             }
-
-            // 새로운 bullet 생성 , 화면 밖으로 움직인 bullet * 난이도만큼 생성
-            //make_bullet(mRgba.width(), mRgba.height(), delete_bullet.size() * hardness);
 
             deleted_bullet += bullet_to_delete.size();
 
@@ -497,7 +497,7 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         return src;
     }
 
-    // 초기 bullet을 number*3 개수만큼 만듬
+    // 초기 bullet을 number*3 개수만큼 생성
     public void init_bullet(int width, int height, int number)
     {
         Random rand = new Random();
@@ -522,7 +522,7 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         }
     }
 
-    // bullet을 추가적으로 생성
+    // bullet을 number * hardness만큼 추가적으로 생성
     public void make_bullet(int width, int height, int number)
     {
         Log.d(TAG, "make bullet" + number);
@@ -557,7 +557,7 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         }
     }
 
-    // astronaut이 bullet에 닿았을때 실행
+    // astronaut이 bullet에 닿았을때 (게임 종료) 실행
     public void game_over()
     {
         is_gameover = true;

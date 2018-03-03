@@ -423,7 +423,7 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         return mRgba;
     }
 
-    // 두 점 사이의 거리
+    // 두 점 a,b 사이의 거리
     public double euclideanDistance(Point a, Point b){
         double distance = 0.0;
 

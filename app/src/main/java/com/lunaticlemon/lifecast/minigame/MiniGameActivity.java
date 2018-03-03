@@ -66,7 +66,7 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
     private Mat astronaut, bullet;
     private Size astronaut_size = new Size(100, 100);
     private Size bullet_size = new Size(100, 100);
-    private int hardness = 2;
+    private int hardness = 4;
 
     double iThreshold = 0;
 
@@ -528,7 +528,7 @@ public class MiniGameActivity extends AppCompatActivity implements View.OnTouchL
         Log.d(TAG, "make bullet" + number);
 
         Random rand = new Random();
-        int multiple = rand.nextInt(3) + 1;
+        int multiple = rand.nextInt(hardness) + 1;
         int temp;
 
         for(int i=0;i<number * multiple;i++)

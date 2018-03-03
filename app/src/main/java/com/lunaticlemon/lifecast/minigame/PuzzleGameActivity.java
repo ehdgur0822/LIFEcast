@@ -506,6 +506,7 @@ public class PuzzleGameActivity extends AppCompatActivity implements View.OnTouc
         return src;
     }
 
+    // 사용자가 click event 발생 시켰는지 확인
     public void check_click(Point effect_point)
     {
         effect_trace.add(effect_point);

@@ -139,15 +139,22 @@ public class PuzzleGameActivity extends AppCompatActivity implements View.OnTouc
 
             @Override
             public void onClick(View v) {
-                // 카메라 방향 변경
-                viewOri++;
-                viewOri %= viewOrinum;
+                // 현재 frame 퍼즐 배경화면으로 저장
+                puzzle_board = mRgba.clone();
 
-                mOpenCvCameraView.disableView();
-                mOpenCvCameraView.setCameraIndex(viewOri); // front-camera(1),  back-camera(0)
-                mOpenCvCameraView.enableView();
+                while(true) {
+                    if (!puzzle_board.empty())
+                        // 카메라 방향 변경
+                        viewOri++;
+                    viewOri %= viewOrinum;
 
-                imageButton_takePicture.setVisibility(View.INVISIBLE);
+                    mOpenCvCameraView.disableView();
+                    mOpenCvCameraView.setCameraIndex(viewOri); // front-camera(1),  back-camera(0)
+                    mOpenCvCameraView.enableView();
+
+                    imageButton_takePicture.setVisibility(View.INVISIBLE);
+                    break;
+                }
             }
         });
     }
@@ -291,8 +298,7 @@ public class PuzzleGameActivity extends AppCompatActivity implements View.OnTouc
 
         if(viewOri == VIEW_ORI_FRONT)
         {
-            puzzle_board = inputFrame.rgba();
-            return puzzle_board;
+            return mRgba;
         }
 
         // 뒤 카메라 이용시 180도 회전
@@ -418,8 +424,7 @@ public class PuzzleGameActivity extends AppCompatActivity implements View.OnTouc
         }
 
         if (checked) {
-            mPuzzleProcessor.puzzleFrame(puzzle_board).copyTo(mIntermediateMat);
-            mIntermediateMat = putMask(mIntermediateMat, far_point, new Size(100, 100));
+            mIntermediateMat = putMask(mPuzzleProcessor.puzzleFrame(puzzle_board), far_point, new Size(100, 100));
             check_click(far_point);
             return mIntermediateMat;
         }
